@@ -32,7 +32,7 @@ async def fetch_agent_card(agent_url: str) -> dict:
         return r.json()
 
 
-async def send_message(agent_url: str, text: str, data: dict = None) -> dict:
+async def send_message(agent_url: str, text: str, data: dict = None, timeout: float = 60.0) -> dict:
     """Send official A2A SendMessage (JSON-RPC 2.0)"""
     parts = [{"text": text, "mediaType": "text/plain"}]
     if data:
@@ -49,7 +49,7 @@ async def send_message(agent_url: str, text: str, data: dict = None) -> dict:
             }
         }
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(agent_url, json=payload)
         try:
             return r.json()
@@ -123,12 +123,17 @@ async def hire(request: Request):
         step(f"✅ Found: {sched_agent['name']} at {surl}")
         step("📤 Step 4: Scheduling interviews via A2A SendMessage...")
         try:
-            sresp    = await send_message(surl, f"Schedule Round 1 interviews for {job_title} candidates.", data=cands)
-            schedule = extract_artifact(sresp)
-            report["schedule"] = schedule
-            step(f"✅ Interviews scheduled")
+            # Add job_title to the data sent to scheduler
+            sched_data = {**cands, "job_title": job_title, "location": location}
+            sresp    = await send_message(surl, f"Schedule Round 1 interviews for {job_title} candidates.", data=sched_data, timeout=90.0)
+            if sresp.get("error") and "result" not in sresp:
+                step(f"⚠️ Scheduler returned error: {sresp.get('error','')}")
+            else:
+                schedule = extract_artifact(sresp)
+                report["schedule"] = schedule
+                step(f"✅ Interviews scheduled")
         except Exception as e:
-            step(f"⚠️ Scheduler error: {e}")
+            step(f"⚠️ Scheduler error: {str(e)[:100]}")
 
     # STEP 3: Background Checks
     step("🔍 Step 5: Querying registry for Background Check Agent...")
