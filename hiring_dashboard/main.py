@@ -51,7 +51,10 @@ async def send_message(agent_url: str, text: str, data: dict = None) -> dict:
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         r = await client.post(agent_url, json=payload)
-        return r.json()
+        try:
+            return r.json()
+        except Exception:
+            return {"error": f"Agent returned non-JSON (HTTP {r.status_code}): {r.text[:200]}"}
 
 
 def extract_artifact(resp: dict) -> dict:
@@ -64,80 +67,114 @@ def extract_artifact(resp: dict) -> dict:
 
 @app.post("/hire")
 async def hire(request: Request):
-    body        = await request.json()
-    job_title   = body.get("job_title", "Software Engineer")
-    experience  = body.get("experience_years", 3)
-    location    = body.get("location", "Remote")
-    notes       = body.get("notes", "")
+    body           = await request.json()
+    job_title      = body.get("job_title", "Software Engineer")
+    experience     = body.get("experience_years", 3)
+    location       = body.get("location", "Remote")
+    notes          = body.get("notes", "")
+    num_candidates = body.get("num_candidates", 5)
+    flow_id        = str(uuid.uuid4())
 
     report = {"request": body, "steps": [], "candidates": {}, "schedule": {}, "background_checks": {}, "status": "in_progress"}
-
     def step(msg): report["steps"].append(msg)
 
-    # ── STEP 1: Find Candidates ────────────────────────────────────────────────
+    # STEP 1: Find Candidates
     step("🔍 Step 1: Querying registry for Candidate Sourcing Agent...")
     agent = await discover_agent("find_candidates")
     if not agent:
-        return JSONResponse({"error": "No sourcing agent registered. Go to the registry /register page to register one."}, status_code=404)
+        report["status"] = "failed"
+        report["steps"].append("❌ No sourcing agent found in registry.")
+        return JSONResponse(report, status_code=404)
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
 
-    step("📋 Step 2: Fetching Agent Card from /.well-known/agent-card.json...")
-    card = await fetch_agent_card(url)
-    step(f"✅ Agent Card — Skills: {[s['id'] for s in card.get('skills',[])]}")
+    try:
+        card = await fetch_agent_card(url)
+        step(f"✅ Agent Card — Skills: {[s['id'] for s in card.get('skills',[])]}")
+    except Exception as e:
+        step(f"⚠️ Agent card: {e}")
 
-    step("📤 Step 3: Sending hiring request via A2A SendMessage...")
-    msg   = f"Find 3 top candidates for {job_title} with {experience} years experience. Location: {location}. {notes}"
-    resp  = await send_message(url, msg)
-    cands = extract_artifact(resp)
+    step(f"📤 Step 2: Sending request for {num_candidates} candidates via A2A SendMessage...")
+    msg = f"Find {num_candidates} top candidates for {job_title} with {experience} years experience in {location}. {notes}"
+    try:
+        resp  = await send_message(url, msg)
+        if resp.get("error") and "result" not in resp:
+            step(f"❌ Sourcing agent error: {resp.get('error','Unknown')}")
+            report["status"] = "failed"
+            return JSONResponse(report)
+        cands = extract_artifact(resp)
+    except Exception as e:
+        step(f"❌ Sourcing agent failed: {e}")
+        report["status"] = "failed"
+        return JSONResponse(report)
+
     report["candidates"] = cands
-    step(f"✅ Received {len(cands.get('candidates',[]))} candidates")
+    num_found = len(cands.get("candidates", []))
+    step(f"✅ Received {num_found} candidates")
 
-    # ── STEP 2: Schedule Interviews ────────────────────────────────────────────
-    step("🔍 Step 4: Querying registry for Interview Scheduler Agent...")
-    agent = await discover_agent("schedule_interview")
-    if not agent:
-        report["status"] = "partial"; step("⚠️ No scheduler agent found.")
-        return JSONResponse(report)
-    url = agent["supportedInterfaces"][0]["url"]
-    step(f"✅ Found: {agent['name']} at {url}")
+    # STEP 2: Schedule Interviews
+    step("🔍 Step 3: Querying registry for Interview Scheduler Agent...")
+    sched_agent = await discover_agent("schedule_interview")
+    if not sched_agent:
+        report["status"] = "partial"
+        step("⚠️ No scheduler agent found — skipping interviews")
+    else:
+        surl = sched_agent["supportedInterfaces"][0]["url"]
+        step(f"✅ Found: {sched_agent['name']} at {surl}")
+        step("📤 Step 4: Scheduling interviews via A2A SendMessage...")
+        try:
+            sresp    = await send_message(surl, f"Schedule Round 1 interviews for {job_title} candidates.", data=cands)
+            schedule = extract_artifact(sresp)
+            report["schedule"] = schedule
+            step(f"✅ Interviews scheduled")
+        except Exception as e:
+            step(f"⚠️ Scheduler error: {e}")
 
-    step("📋 Step 5: Fetching Scheduler Agent Card...")
-    card = await fetch_agent_card(url)
-    step(f"✅ Agent Card — Skills: {[s['id'] for s in card.get('skills',[])]}")
-
-    step("📤 Step 6: Sending candidates to Scheduler Agent via A2A SendMessage...")
-    resp     = await send_message(url, f"Schedule interviews for {job_title} candidates.", data=cands)
-    schedule = extract_artifact(resp)
-    report["schedule"] = schedule
-    step(f"✅ Interview schedule created")
-
-    # ── STEP 3: Background Check ───────────────────────────────────────────────
-    step("🔍 Step 7: Querying registry for Background Check Agent...")
-    agent = await discover_agent("verify_candidate")
-    if not agent:
-        report["status"] = "partial"; step("⚠️ No background check agent found. Register one at the registry /register page")
-        return JSONResponse(report)
-    url = agent["supportedInterfaces"][0]["url"]
-    step(f"✅ Found: {agent['name']} at {url}")
-
-    step("📋 Step 8: Fetching Background Check Agent Card...")
-    card = await fetch_agent_card(url)
-    step(f"✅ Agent Card — Skills: {[s['id'] for s in card.get('skills',[])]}")
-
-    step("📤 Step 9: Running background checks via A2A SendMessage...")
-    resp   = await send_message(url, f"Run background checks for {job_title} candidates.", data=cands)
-    checks = extract_artifact(resp)
-    report["background_checks"] = checks
-    step("✅ Background checks completed for all candidates")
+    # STEP 3: Background Checks
+    step("🔍 Step 5: Querying registry for Background Check Agent...")
+    bg_agent = await discover_agent("verify_candidate")
+    if not bg_agent:
+        report["status"] = "partial"
+        step("⚠️ No background check agent found — skipping")
+    else:
+        bgurl = bg_agent["supportedInterfaces"][0]["url"]
+        step(f"✅ Found: {bg_agent['name']} at {bgurl}")
+        step("📤 Step 6: Running background checks via A2A SendMessage...")
+        try:
+            bgresp = await send_message(bgurl, f"Run background checks for {job_title} candidates.", data=cands)
+            checks = extract_artifact(bgresp)
+            report["background_checks"] = checks
+            step("✅ Background checks complete")
+        except Exception as e:
+            step(f"⚠️ Background check error: {e}")
 
     report["status"] = "completed"
-    step("🎉 Full hiring flow completed — Candidates sourced, interviewed, and verified!")
+    step("🎉 Full hiring flow completed!")
+
+    # Log to audit
+    try:
+        import json as _json
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(f"{REGISTRY_URL}/registry/audit/create", json={
+                "flow_id": flow_id, "flow_type": "hiring",
+                "title": job_title, "subtitle": f"{experience} yrs exp",
+                "location": location, "experience_years": experience
+            })
+            await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
+                "flow_id": flow_id, "status": "completed",
+                "agents_used": _json.dumps(["Sourcing Agent","Scheduler Agent","Background Agent"]),
+                "result_count": num_found,
+                "result_data": _json.dumps(cands),
+                "secondary_data": _json.dumps(report.get("schedule",{})),
+                "tertiary_data": _json.dumps(report.get("background_checks",{})),
+                "completed_at": "now"
+            })
+    except Exception as e:
+        print(f"Audit log error: {e}")
+
     return JSONResponse(report)
 
 
-
-# ── Registry status endpoint (proxied — avoids CORS) ─────────────────────────
 @app.get("/registry-status")
 async def registry_status():
     try:
