@@ -115,27 +115,40 @@ async def hire(request: Request):
     # STEP 2: Schedule Interviews
     step("🔍 Step 3: Querying registry for Interview Scheduler Agent...")
     sched_agent = await discover_agent("schedule_interview")
+    schedule = {}
     if not sched_agent:
         report["status"] = "partial"
         step("⚠️ No scheduler agent found — skipping interviews")
     else:
         surl = sched_agent["supportedInterfaces"][0]["url"]
         step(f"✅ Found: {sched_agent['name']} at {surl}")
-        step("📤 Step 4: Scheduling interviews via A2A SendMessage...")
+        step("📤 Step 4: Scheduling Round 1 interviews via A2A SendMessage...")
         try:
-            # Add job_title to the data sent to scheduler
             sched_data = {**cands, "job_title": job_title, "location": location}
-            sresp    = await send_message(surl, f"Schedule Round 1 interviews for {job_title} candidates.", data=sched_data, timeout=90.0)
+            sresp = await send_message(
+                surl,
+                f"Schedule Round 1 interviews for {job_title} candidates.",
+                data=sched_data,
+                timeout=120.0
+            )
             if sresp.get("error") and "result" not in sresp:
-                step(f"⚠️ Scheduler returned error: {sresp.get('error','')}")
+                step(f"⚠️ Scheduler: {sresp.get('error','')[:80]}")
             else:
                 schedule = extract_artifact(sresp)
                 report["schedule"] = schedule
-                step(f"✅ Interviews scheduled")
+                num_sched = len(schedule.get("schedules", []))
+                email_note = schedule.get("email_notifications", [])
+                email_sent = any(e.get("success") for e in email_note)
+                step(f"✅ {num_sched} Round 1 interviews scheduled")
+                if email_sent:
+                    step("📧 Interview notification emails sent to HR team")
+                else:
+                    step("⚠️ Email notifications: Railway SMTP restricted — check logs")
         except Exception as e:
-            step(f"⚠️ Scheduler error: {str(e)[:100]}")
+            step(f"⚠️ Scheduler: {str(e)[:100]}")
 
-    # STEP 3: Background Checks
+    # STEP 3: Background Checks — only for candidates who cleared Round 1
+    # Per correct hiring flow: Source → Schedule → Background Check → Offer
     step("🔍 Step 5: Querying registry for Background Check Agent...")
     bg_agent = await discover_agent("verify_candidate")
     if not bg_agent:
@@ -144,17 +157,30 @@ async def hire(request: Request):
     else:
         bgurl = bg_agent["supportedInterfaces"][0]["url"]
         step(f"✅ Found: {bg_agent['name']} at {bgurl}")
-        step("📤 Step 6: Running background checks via A2A SendMessage...")
+        # Only run bg check on candidates who have interviews scheduled
+        scheduled_logins = set()
+        if schedule.get("schedules"):
+            scheduled_logins = {s.get("github_login","") for s in schedule["schedules"]}
+            shortlisted = {
+                "candidates": [c for c in cands.get("candidates",[])
+                               if c.get("github_login","") in scheduled_logins or not scheduled_logins],
+                "job_title": job_title
+            }
+            step(f"📤 Step 6: Running background checks for {len(shortlisted['candidates'])} shortlisted candidates...")
+        else:
+            shortlisted = {**cands, "job_title": job_title}
+            step("📤 Step 6: Running background checks for all candidates...")
         try:
-            bgresp = await send_message(bgurl, f"Run background checks for {job_title} candidates.", data=cands)
+            bgresp = await send_message(bgurl, f"Run background checks for shortlisted {job_title} candidates.", data=shortlisted)
             checks = extract_artifact(bgresp)
             report["background_checks"] = checks
-            step("✅ Background checks complete")
+            passed = sum(1 for c in checks.get("results",[]) if c.get("overall_status") == "PASS")
+            step(f"✅ Background checks complete — {passed} candidates cleared")
         except Exception as e:
-            step(f"⚠️ Background check error: {e}")
+            step(f"⚠️ Background check error: {str(e)[:80]}")
 
     report["status"] = "completed"
-    step("🎉 Full hiring flow completed!")
+    step("🎉 Full hiring flow completed — Source → Schedule → Background Check done!")
 
     # Log to audit
     try:
@@ -286,6 +312,8 @@ async def home():
       <div class="f">
         <label>No. of Candidates</label>
         <select id="numcands">
+          <option value="1">1 candidate</option>
+          <option value="2">2 candidates</option>
           <option value="3">3 candidates</option>
           <option value="5" selected>5 candidates</option>
           <option value="8">8 candidates</option>

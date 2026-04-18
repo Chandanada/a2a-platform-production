@@ -81,10 +81,29 @@ def send_email(to_addresses: list, subject: str, html_body: str) -> bool:
         msg["To"]      = ", ".join(to_addresses)
         msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
-            smtp.sendmail(GMAIL_SENDER, to_addresses, msg.as_string())
-        return True
+        sent = False
+        # Try port 587 TLS
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.ehlo()
+                smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+                smtp.sendmail(GMAIL_SENDER, to_addresses, msg.as_string())
+            print(f"✅ Email sent via port 587 to {to_addresses}")
+            return True
+        except Exception as e587:
+            print(f"⚠️ Port 587 failed: {e587}")
+        # Try port 465 SSL
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as smtp:
+                smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+                smtp.sendmail(GMAIL_SENDER, to_addresses, msg.as_string())
+            print(f"✅ Email sent via port 465 to {to_addresses}")
+            return True
+        except Exception as e465:
+            print(f"⚠️ Port 465 failed: {e465}")
+        return False
     except Exception as e:
         print(f"❌ Email error: {e}")
         return False
