@@ -135,8 +135,12 @@ async def proxy_agent_card(url: str):
 
 # ── Agent Management ──────────────────────────────────────────────────────────
 
-@app.delete("/registry/agents/{name}")
-async def delete_agent(name: str):
+@app.post("/registry/agents/delete")
+async def delete_agent(request: Request):
+    body = await request.json()
+    name = body.get("name", "")
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
     conn = get_connection()
     cur  = conn.cursor()
     cur.execute("DELETE FROM agents WHERE name=%s RETURNING id", (name,))
@@ -147,10 +151,13 @@ async def delete_agent(name: str):
     return {"status": "deleted", "name": name}
 
 
-@app.patch("/registry/agents/{name}/status")
-async def update_agent_status(name: str, request: Request):
+@app.post("/registry/agents/set-status")
+async def update_agent_status(request: Request):
     body   = await request.json()
+    name   = body.get("name", "")
     status = body.get("status", "active")
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
     if status not in ("active", "inactive"):
         raise HTTPException(status_code=400, detail="Status must be active or inactive")
     conn = get_connection()
