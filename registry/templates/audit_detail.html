@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Flow Detail — A2A Registry</title>
+  <style>
+    :root{--bg:#0e0820;--card:#1a0d3d;--border:#2d1f6e;--purple:#7c3aed;--pink:#ec4899;--violet:#a78bfa;--text:#e2e8f0;--muted:#7c6fa0;--green:#10b981;--red:#f87171;--amber:#f59e0b}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{background:rgba(19,10,46,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}
+    .brand-name{font-size:15px;font-weight:800;color:#fff}
+    .badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
+    .nav-links a:hover{color:var(--violet);background:rgba(124,58,237,0.15)}
+    .container{max-width:900px;margin:0 auto;padding:28px 24px}
+    .back{color:var(--violet);text-decoration:none;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:4px;margin-bottom:20px}
+    .page-title{font-size:20px;font-weight:800;margin-bottom:4px}
+    .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+    .card-title{font-size:11px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+    .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+    .row:last-child{border:none}
+    .row .k{color:var(--muted)}.row .v{font-weight:600}
+    .s-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+    .s-completed{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
+    .s-in_progress{background:rgba(124,58,237,0.1);color:var(--violet);border:1px solid rgba(124,58,237,0.25)}
+    .s-failed{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.25)}
+    .type-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+    .t-hiring{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
+    .t-travel{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.25)}
+    .t-hr_ops{background:rgba(236,72,153,0.1);color:#f9a8d4;border:1px solid rgba(236,72,153,0.25)}
+    .agent-tag{background:rgba(124,58,237,0.1);color:var(--violet);border:1px solid rgba(124,58,237,0.2);border-radius:6px;padding:4px 10px;font-size:12px;display:inline-block;margin:3px}
+    pre{background:#080c1a;border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:400px;overflow-y:auto;color:var(--muted)}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="brand"><div class="logo">🤖</div><span class="brand-name">A2A Registry</span><span class="badge">Google A2A Protocol</span></div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="/">Directory</a><a href="/register">Register Agent</a>
+    <a href="/audit" style="color:var(--violet);background:rgba(124,58,237,0.15)">Audit Logs</a>
+    <a href="/analytics">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <a href="/audit" class="back">← Back to Audit Logs</a>
+  <div class="page-title">Flow Detail</div>
+  <div class="page-sub">{{ log.flow_id }}</div>
+
+  <div class="card">
+    <div class="card-title">Summary</div>
+    <div class="row"><span class="k">Flow Type</span><span class="v">
+      <span class="type-badge t-{{ log.flow_type }}">
+        {% if log.flow_type=='hiring' %}🧑‍💼 Hiring
+        {% elif log.flow_type=='travel' %}✈️ Travel
+        {% elif log.flow_type=='hr_ops' %}👔 HR Ops
+        {% else %}{{ log.flow_type }}{% endif %}
+      </span>
+    </span></div>
+    <div class="row"><span class="k">Title</span><span class="v" style="color:#fff">{{ log.title }}</span></div>
+    {% if log.subtitle %}<div class="row"><span class="k">Subtitle</span><span class="v">{{ log.subtitle }}</span></div>{% endif %}
+    {% if log.location %}<div class="row"><span class="k">Location</span><span class="v">{{ log.location }}</span></div>{% endif %}
+    <div class="row"><span class="k">Status</span><span class="v"><span class="s-badge s-{{ log.status }}">{{ log.status }}</span></span></div>
+    <div class="row"><span class="k">Result Count</span><span class="v" style="color:var(--green)">{{ log.result_count or 0 }}</span></div>
+    <div class="row"><span class="k">Started</span><span class="v">{{ (log.started_at or '')|string|truncate(19,True,'') }}</span></div>
+    {% if log.completed_at %}<div class="row"><span class="k">Completed</span><span class="v">{{ (log.completed_at or '')|string|truncate(19,True,'') }}</span></div>{% endif %}
+  </div>
+
+  {% if log.agents_used %}
+  <div class="card">
+    <div class="card-title">Agents Used</div>
+    {% set agents = log.agents_used if log.agents_used is iterable and log.agents_used is not string else [] %}
+    {% for a in agents %}<span class="agent-tag">{{ a }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if log.result_data %}
+  <div class="card">
+    <div class="card-title">Result Data</div>
+    <pre>{{ log.result_data | tojson(indent=2) if log.result_data is mapping else log.result_data }}</pre>
+  </div>
+  {% endif %}
+
+  {% if log.emails_sent_to %}
+  <div class="card">
+    <div class="card-title">Emails Sent To</div>
+    {% set emails = log.emails_sent_to if log.emails_sent_to is iterable and log.emails_sent_to is not string else [log.emails_sent_to] %}
+    {% for e in emails %}<div style="font-size:13px;padding:4px 0">📧 {{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

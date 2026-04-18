@@ -1,0 +1,85 @@
+<!-- register.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Register Agent — A2A Registry</title>
+  <style>
+    :root{--bg:#0e0820;--card:#1a0d3d;--border:#2d1f6e;--purple:#7c3aed;--pink:#ec4899;--violet:#a78bfa;--text:#e2e8f0;--muted:#7c6fa0;--green:#10b981;--red:#f87171}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{background:rgba(19,10,46,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}
+    .brand-name{font-size:15px;font-weight:800;color:#fff}
+    .badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
+    .nav-links a:hover,.nav-links a.active{color:var(--violet);background:rgba(124,58,237,0.15)}
+    .container{max-width:640px;margin:0 auto;padding:28px 24px}
+    .page-title{font-size:22px;font-weight:800;margin-bottom:4px}
+    .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px}
+    .field{margin-bottom:16px}
+    label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+    input,textarea,select{width:100%;background:#080c1a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit}
+    input:focus,textarea:focus{border-color:var(--purple)}
+    textarea{resize:vertical;min-height:70px}
+    .btn{width:100%;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+    .btn:hover{opacity:.88}
+    .success{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;margin-bottom:20px;color:var(--green)}
+    .error{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:12px;padding:16px;margin-bottom:20px;color:var(--red)}
+    .divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+    .api-box{background:#080c1a;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:12px;color:var(--muted);margin-top:8px;word-break:break-all}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="brand"><div class="logo">🤖</div><span class="brand-name">A2A Registry</span><span class="badge">Google A2A Protocol</span></div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="/">Directory</a>
+    <a href="/register" class="active" style="color:var(--violet);background:rgba(124,58,237,0.15)">Register Agent</a>
+    <a href="/audit">Audit Logs</a><a href="/analytics">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <div class="page-title">Register Agent</div>
+  <div class="page-sub">Add a remote agent to the A2A registry</div>
+
+  {% if success %}
+  <div class="success">
+    ✅ <strong>{{ registered_agent.name }}</strong> registered successfully!
+    <a href="/agents/{{ registered_agent.name }}" style="color:var(--green);margin-left:8px;font-weight:700">View Agent →</a>
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="error">❌ Error: {{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <form method="POST" action="/register">
+      <div class="field"><label>Agent Name *</label><input name="name" placeholder="Sourcing Agent" required/></div>
+      <div class="field"><label>Agent URL *</label><input name="agent_url" placeholder="https://your-agent.up.railway.app" required/></div>
+      <div class="field"><label>Description</label><textarea name="description" placeholder="What does this agent do?"></textarea></div>
+      <div class="field"><label>Skill ID *</label><input name="skill_id" placeholder="find_candidates"/></div>
+      <div class="field"><label>Skill Name</label><input name="skill_name" placeholder="Find Candidates"/></div>
+      <div class="field"><label>Tags (comma separated)</label><input name="tags" placeholder="hiring, sourcing, github"/></div>
+      <div class="field"><label>Version</label><input name="version" value="1.0.0"/></div>
+      <button type="submit" class="btn">Register Agent</button>
+    </form>
+  </div>
+
+  <hr class="divider"/>
+
+  <div class="card">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">API Registration</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Or register via API with your key:</div>
+    <div class="api-box">
+POST /registry/register<br>
+X-API-Key: {{ api_key }}<br>
+{"name":"...","agent_url":"...","skills":[{"id":"...","name":"..."}]}
+    </div>
+  </div>
+</div>
+</body>
+</html>

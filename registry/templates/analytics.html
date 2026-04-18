@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Analytics — A2A Registry</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root{--bg:#0e0820;--card:#1a0d3d;--border:#2d1f6e;--purple:#7c3aed;--pink:#ec4899;--violet:#a78bfa;--text:#e2e8f0;--muted:#7c6fa0;--green:#10b981;--red:#f87171;--amber:#f59e0b}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{background:rgba(19,10,46,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}
+    .brand-name{font-size:15px;font-weight:800;color:#fff}
+    .badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
+    .nav-links a:hover,.nav-links a.active{color:var(--violet);background:rgba(124,58,237,0.15)}
+    .container{max-width:1200px;margin:0 auto;padding:28px 24px}
+    .page-title{font-size:22px;font-weight:800;margin-bottom:4px}
+    .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+    .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px}
+    .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+    .kpi .num{font-size:22px;font-weight:800}.kpi .lbl{font-size:11px;color:var(--muted);margin-top:3px}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    .chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px}
+    .chart-title{font-size:13px;font-weight:700;margin-bottom:4px}
+    .chart-sub{font-size:11px;color:var(--muted);margin-bottom:16px}
+    .chart-wrap{position:relative;height:200px}
+    .recent-table{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+    .recent-title{padding:16px 20px;font-size:14px;font-weight:700;border-bottom:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse}
+    th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:rgba(14,8,32,0.5);border-bottom:1px solid var(--border)}
+    td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--border)}
+    tr:last-child td{border-bottom:none}
+    .s-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+    .s-completed{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
+    .s-in_progress{background:rgba(124,58,237,0.1);color:var(--violet);border:1px solid rgba(124,58,237,0.25)}
+    .type-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+    .t-hiring{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
+    .t-travel{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.25)}
+    .t-hr_ops{background:rgba(236,72,153,0.1);color:#f9a8d4;border:1px solid rgba(236,72,153,0.25)}
+    a.vlink{color:var(--violet);text-decoration:none;font-weight:600}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="brand"><div class="logo">🤖</div><span class="brand-name">A2A Registry</span><span class="badge">Google A2A Protocol</span></div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="/">Directory</a><a href="/register">Register Agent</a><a href="/audit">Audit Logs</a>
+    <a href="/analytics" class="active" style="color:var(--violet);background:rgba(124,58,237,0.15)">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <div class="page-title">📊 Platform Analytics</div>
+  <div class="page-sub">Real-time insights across all agent flows</div>
+
+  {% set k = data.kpis %}
+  <div class="kpis">
+    <div class="kpi"><div class="num" style="color:var(--violet)">{{ k.total_flows }}</div><div class="lbl">Total Flows</div></div>
+    <div class="kpi"><div class="num" style="color:var(--green)">{{ k.completed_flows }}</div><div class="lbl">Completed</div></div>
+    <div class="kpi"><div class="num" style="color:var(--amber)">{{ k.total_candidates }}</div><div class="lbl">Candidates Sourced</div></div>
+    <div class="kpi"><div class="num" style="color:#f9a8d4">{{ k.total_agents }}</div><div class="lbl">Active Agents</div></div>
+    <div class="kpi"><div class="num" style="color:var(--green)">{{ k.success_rate }}%</div><div class="lbl">Success Rate</div></div>
+    <div class="kpi"><div class="num" style="color:var(--violet)">{{ k.avg_candidates }}</div><div class="lbl">Avg Candidates</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-title">Flows Per Day</div>
+      <div class="chart-sub">Last 14 days</div>
+      <div class="chart-wrap"><canvas id="flowsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Flow Type Breakdown</div>
+      <div class="chart-sub">Hiring vs Travel vs HR Ops</div>
+      <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Candidates Per Day</div>
+      <div class="chart-sub">GitHub profiles sourced</div>
+      <div class="chart-wrap"><canvas id="candidatesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Top Job Titles</div>
+      <div class="chart-sub">Most searched roles</div>
+      <div class="chart-wrap"><canvas id="jobsChart"></canvas></div>
+    </div>
+  </div>
+
+  {% if data.recent_flows %}
+  <div class="recent-table">
+    <div class="recent-title">Recent Flows</div>
+    <table>
+      <thead><tr><th>Type</th><th>Title</th><th>Location</th><th>Results</th><th>Status</th><th>Started</th><th></th></tr></thead>
+      <tbody>
+      {% for r in data.recent_flows %}
+      <tr>
+        <td><span class="type-badge t-{{ r.flow_type }}">
+          {% if r.flow_type=='hiring' %}🧑‍💼{% elif r.flow_type=='travel' %}✈️{% else %}👔{% endif %}
+          {{ r.flow_type }}
+        </span></td>
+        <td style="font-weight:600;color:#fff">{{ r.title }}</td>
+        <td style="color:var(--muted)">{{ r.location or '—' }}</td>
+        <td style="color:var(--green);font-weight:700">{{ r.result_count or 0 }}</td>
+        <td><span class="s-badge s-{{ r.status }}">{{ r.status }}</span></td>
+        <td style="color:var(--muted);font-size:11px">{{ (r.started_at or '')|string|truncate(16,True,'') }}</td>
+        <td><a href="/audit/{{ r.flow_id }}" class="vlink">View →</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+const cd = { plugins:{ legend:{labels:{color:'#7c6fa0',font:{size:11}}}},
+              scales:{ x:{ticks:{color:'#7c6fa0',font:{size:10}},grid:{color:'#2d1f6e'}},
+                       y:{ticks:{color:'#7c6fa0',font:{size:10}},grid:{color:'#2d1f6e'}}}};
+
+const fpd = {{ data.flows_per_day | tojson }};
+new Chart(document.getElementById('flowsChart'),{type:'bar',
+  data:{labels:fpd.map(d=>d.day.slice(5)),
+        datasets:[{label:'Flows',data:fpd.map(d=>d.count),
+                   backgroundColor:'rgba(124,58,237,0.5)',borderColor:'#7c3aed',borderWidth:1}]},
+  options:{...cd,plugins:{...cd.plugins,legend:{display:false}}}});
+
+const td2 = {{ data.flow_type_breakdown | tojson }};
+new Chart(document.getElementById('typeChart'),{type:'doughnut',
+  data:{labels:td2.map(d=>d.type),
+        datasets:[{data:td2.map(d=>d.count),
+                   backgroundColor:['rgba(16,185,129,0.7)','rgba(245,158,11,0.7)','rgba(236,72,153,0.7)'],
+                   borderColor:['#10b981','#f59e0b','#ec4899'],borderWidth:1}]},
+  options:{plugins:{legend:{labels:{color:'#7c6fa0',font:{size:11}}}},maintainAspectRatio:false}});
+
+const cpd = {{ data.candidates_per_day | tojson }};
+new Chart(document.getElementById('candidatesChart'),{type:'line',
+  data:{labels:cpd.map(d=>d.day.slice(5)),
+        datasets:[{label:'Candidates',data:cpd.map(d=>d.count),
+                   borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)',
+                   fill:true,tension:0.4,pointBackgroundColor:'#10b981'}]},
+  options:{...cd,plugins:{...cd.plugins,legend:{display:false}}}});
+
+const tj = {{ data.top_jobs | tojson }};
+new Chart(document.getElementById('jobsChart'),{type:'bar',
+  data:{labels:tj.map(d=>d.job.slice(0,20)),
+        datasets:[{label:'Searches',data:tj.map(d=>d.count),
+                   backgroundColor:'rgba(59,130,246,0.5)',borderColor:'#3b82f6',borderWidth:1}]},
+  options:{...cd,indexAxis:'y',plugins:{...cd.plugins,legend:{display:false}}}});
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>A2A Registry — Agent Directory</title>
+  <style>
+    :root{--bg:#0e0820;--card:#1a0d3d;--border:#2d1f6e;--purple:#7c3aed;--pink:#ec4899;--violet:#a78bfa;--text:#e2e8f0;--muted:#7c6fa0;--green:#10b981;--red:#f87171;--amber:#f59e0b}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{background:rgba(19,10,46,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}
+    .brand-name{font-size:15px;font-weight:800;color:#fff}
+    .badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
+    .nav-links a:hover,.nav-links a.active{color:var(--violet);background:rgba(124,58,237,0.15)}
+    .container{max-width:1100px;margin:0 auto;padding:28px 24px}
+    .page-title{font-size:22px;font-weight:800;margin-bottom:4px}
+    .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+    .stat .num{font-size:26px;font-weight:800}
+    .stat .lbl{font-size:12px;color:var(--muted);margin-top:4px}
+    .n-v{color:var(--violet)}.n-g{color:var(--green)}.n-p{color:#f9a8d4}.n-a{color:var(--amber)}
+    .agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+    .agent-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;transition:border-color .2s}
+    .agent-card:hover{border-color:var(--purple)}
+    .ac-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+    .ac-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .ac-name{font-size:14px;font-weight:700;margin-bottom:3px}
+    .ac-url{font-size:11px;color:var(--muted);font-family:monospace}
+    .ac-desc{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+    .skill-tag{background:rgba(124,58,237,0.1);color:var(--violet);border:1px solid rgba(124,58,237,0.2);border-radius:4px;padding:2px 7px;font-size:10px;display:inline-block;margin:2px}
+    .ac-status{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+    .status-active{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
+    .ac-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+    .ac-time{font-size:11px;color:var(--muted)}
+    .btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);text-decoration:none}
+    .btn:hover{border-color:var(--purple);color:var(--violet)}
+    .reg-btn{background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:9px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none}
+    .empty{text-align:center;padding:60px;color:var(--muted)}
+    .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="brand">
+    <div class="logo">🤖</div>
+    <span class="brand-name">A2A Registry</span>
+    <span class="badge">Google A2A Protocol</span>
+  </div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="/" class="active" style="color:var(--violet);background:rgba(124,58,237,0.15)">Directory</a>
+    <a href="/register">Register Agent</a>
+    <a href="/audit">Audit Logs</a>
+    <a href="/analytics">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <div class="header-row">
+    <div>
+      <div class="page-title">🤖 Agent Directory</div>
+      <div class="page-sub">All registered A2A agents on this platform</div>
+    </div>
+    <a href="/register" class="reg-btn">+ Register Agent</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="num n-v">{{ agents|length }}</div><div class="lbl">Total Agents</div></div>
+    <div class="stat"><div class="num n-g">{{ agents|selectattr('status','eq','active')|list|length }}</div><div class="lbl">Active</div></div>
+    <div class="stat"><div class="num n-p">{{ agents|map(attribute='skills')|sum(start=[])|list|length }}</div><div class="lbl">Total Skills</div></div>
+    <div class="stat"><div class="num n-a" style="color:var(--green)">● Live</div><div class="lbl">Platform Status</div></div>
+  </div>
+
+  {% if agents %}
+  <div class="agent-grid">
+  {% for agent in agents %}
+    <div class="agent-card">
+      <div class="ac-top">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div class="ac-icon">
+            {% if 'sourcing' in agent.name|lower %}🔍
+            {% elif 'scheduler' in agent.name|lower %}📅
+            {% elif 'background' in agent.name|lower %}🔎
+            {% elif 'travel' in agent.name|lower %}✈️
+            {% elif 'hr' in agent.name|lower or 'payroll' in agent.name|lower %}👔
+            {% elif 'payment' in agent.name|lower or 'ap2' in agent.name|lower %}💳
+            {% else %}🤖{% endif %}
+          </div>
+          <div>
+            <div class="ac-name">{{ agent.name }}</div>
+            <div class="ac-url">{{ agent.agent_url }}</div>
+          </div>
+        </div>
+        <span class="ac-status status-active">{{ agent.status }}</span>
+      </div>
+      <div class="ac-desc">{{ agent.description[:120] }}{% if agent.description|length > 120 %}...{% endif %}</div>
+      <div>
+        {% for skill in agent.skills[:4] %}
+          <span class="skill-tag">{{ skill.id if skill is mapping else skill }}</span>
+        {% endfor %}
+      </div>
+      <div class="ac-footer">
+        <span class="ac-time">Registered {{ agent.registered_at|string|truncate(10,True,'') }}</span>
+        <a href="/agents/{{ agent.name }}" class="btn">View →</a>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>No agents registered yet</h3>
+    <p style="margin:8px 0 20px">Register your first agent to get started.</p>
+    <a href="/register" class="reg-btn">Register First Agent</a>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

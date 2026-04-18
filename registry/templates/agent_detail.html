@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><title>{{ agent.name }} — A2A Registry</title>
+  <style>
+    :root{--bg:#0e0820;--card:#1a0d3d;--border:#2d1f6e;--purple:#7c3aed;--violet:#a78bfa;--text:#e2e8f0;--muted:#7c6fa0;--green:#10b981}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{background:rgba(19,10,46,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}
+    .brand-name{font-size:15px;font-weight:800;color:#fff}
+    .badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
+    .nav-links a:hover{color:var(--violet);background:rgba(124,58,237,0.15)}
+    .container{max-width:800px;margin:0 auto;padding:28px 24px}
+    .back{color:var(--violet);text-decoration:none;font-size:13px;font-weight:600;display:inline-flex;gap:4px;margin-bottom:20px}
+    .agent-header{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+    .agent-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:28px}
+    .agent-name{font-size:22px;font-weight:800}
+    .agent-url{font-size:12px;color:var(--muted);font-family:monospace;margin-top:4px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+    .card-title{font-size:11px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+    .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+    .row:last-child{border:none}
+    .row .k{color:var(--muted)}.row .v{font-weight:600}
+    .skill-card{background:#080c1a;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px}
+    .skill-id{font-size:12px;font-family:monospace;color:var(--violet);font-weight:700}
+    .skill-name{font-size:14px;font-weight:700;margin:4px 0}
+    .skill-desc{font-size:12px;color:var(--muted)}
+    .status-active{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+    .try-btn{background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:9px 20px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;margin-top:10px}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="brand"><div class="logo">🤖</div><span class="brand-name">A2A Registry</span><span class="badge">Google A2A Protocol</span></div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="/">Directory</a><a href="/register">Register Agent</a><a href="/audit">Audit Logs</a><a href="/analytics">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <a href="/" class="back">← Directory</a>
+  <div class="agent-header">
+    <div class="agent-icon">
+      {% if 'sourcing' in agent.name|lower %}🔍
+      {% elif 'scheduler' in agent.name|lower %}📅
+      {% elif 'background' in agent.name|lower %}🔎
+      {% elif 'travel' in agent.name|lower %}✈️
+      {% elif 'hr' in agent.name|lower %}👔
+      {% elif 'payment' in agent.name|lower or 'ap2' in agent.name|lower %}💳
+      {% else %}🤖{% endif %}
+    </div>
+    <div>
+      <div class="agent-name">{{ agent.name }}</div>
+      <div class="agent-url"><a href="{{ agent.agent_url }}/.well-known/agent-card.json" target="_blank" style="color:var(--muted)">{{ agent.agent_url }}/.well-known/agent-card.json</a></div>
+    </div>
+    <span class="status-active">{{ agent.status }}</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Details</div>
+    <div class="row"><span class="k">Description</span><span class="v" style="max-width:400px;text-align:right">{{ agent.description }}</span></div>
+    <div class="row"><span class="k">Version</span><span class="v">{{ agent.version }}</span></div>
+    <div class="row"><span class="k">Agent URL</span><span class="v" style="font-family:monospace;font-size:11px">{{ agent.agent_url }}</span></div>
+    <div class="row"><span class="k">Registered</span><span class="v">{{ (agent.registered_at or '')|string|truncate(16,True,'') }}</span></div>
+  </div>
+
+  {% if agent.skills %}
+  <div class="card">
+    <div class="card-title">Skills</div>
+    {% for skill in agent.skills %}
+    <div class="skill-card">
+      <div class="skill-id">{{ skill.id if skill is mapping else skill }}</div>
+      <div class="skill-name">{{ skill.name if skill is mapping else skill }}</div>
+      {% if skill is mapping and skill.description %}
+      <div class="skill-desc">{{ skill.description }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <a href="{{ agent.agent_url }}/.well-known/agent-card.json" target="_blank" class="try-btn">View Agent Card JSON →</a>
+</div>
+</body>
+</html>
