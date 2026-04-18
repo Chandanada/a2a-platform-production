@@ -60,9 +60,11 @@ def get_agent_card():
     return JSONResponse(content=AGENT_CARD)
 
 
-async def search_github_developers(language: str, min_followers: int = 10, count: int = 3) -> list:
+async def search_github_developers(language: str, min_followers: int = 5,
+                                    count: int = 5, location: str = "",
+                                    job_title: str = "") -> list:
     """
-    Search real GitHub developers by programming language.
+    Search real GitHub developers by programming language + location.
     Uses GitHub public search API — read only, no contact made.
     """
     headers = {
@@ -71,18 +73,33 @@ async def search_github_developers(language: str, min_followers: int = 10, count
         "X-GitHub-Api-Version": "2022-11-28"
     }
 
-    query = f"language:{language} followers:>{min_followers} repos:>5"
+    # Build role-specific query
+    query = f"language:{language} followers:>{min_followers} repos:>3"
+
+    # Add location filter for non-remote searches
+    loc_lower = location.lower()
+    if location and loc_lower not in ("remote", "outside india", ""):
+        # Map common location names to GitHub location format
+        loc_map = {
+            "india": "India", "bangalore": "Bangalore", "bengaluru": "Bengaluru",
+            "mumbai": "Mumbai", "delhi": "Delhi", "hyderabad": "Hyderabad",
+            "pune": "Pune", "usa": "United States", "uk": "United Kingdom",
+            "singapore": "Singapore", "uae": "Dubai"
+        }
+        gh_loc = loc_map.get(loc_lower, location)
+        query += f" location:{gh_loc}"
+
+    fetch_count = min(count * 3, 30)  # fetch more to filter
 
     async with httpx.AsyncClient() as client:
-        # Search users
         search_resp = await client.get(
             "https://api.github.com/search/users",
-            params={"q": query, "sort": "followers", "order": "desc", "per_page": 10},
+            params={"q": query, "sort": "repositories", "order": "desc", "per_page": fetch_count},
             headers=headers,
             timeout=15.0
         )
         search_data = search_resp.json()
-        users = search_data.get("items", [])[:count * 2]  # fetch extra in case some have no details
+        users = search_data.get("items", [])[:count * 2]
 
         profiles = []
         for user in users:
@@ -200,10 +217,17 @@ async def handle_message(request: Request):
     user_text = next((p["text"] for p in parts if "text" in p), "")
 
     # Extract job details from request
-    data_part = next((p["data"] for p in parts if "data" in p), {})
-    job_title  = data_part.get("job_title", "Software Engineer")
-    experience = data_part.get("experience_years", 3)
-    location   = data_part.get("location", "Remote")
+    data_part      = next((p["data"] for p in parts if "data" in p), {})
+    job_title      = data_part.get("job_title", "Software Engineer")
+    experience     = data_part.get("experience_years", 3)
+    location       = data_part.get("location", "Remote")
+    num_candidates = data_part.get("num_candidates", 5)
+
+    # Also try to parse from text message
+    if not data_part and user_text:
+        import re
+        m = re.search(r"Find (\d+)", user_text)
+        if m: num_candidates = int(m.group(1))
 
     # Detect programming language from job title
     language_map = {
@@ -225,8 +249,10 @@ async def handle_message(request: Request):
     # Step 1 — Fetch real GitHub profiles
     github_profiles = await search_github_developers(
         language=detected_language,
-        min_followers=10,
-        count=3
+        min_followers=5,
+        count=num_candidates,
+        location=location,
+        job_title=job_title
     )
 
     if not github_profiles:
