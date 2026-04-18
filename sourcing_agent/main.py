@@ -89,7 +89,7 @@ async def search_github_developers(language: str, min_followers: int = 5,
         gh_loc = loc_map.get(loc_lower, location)
         query += f" location:{gh_loc}"
 
-    fetch_count = min(count * 3, 30)  # fetch more to filter
+    fetch_count = min(count * 2, 20)  # keep reasonable to avoid rate limits
 
     async with httpx.AsyncClient() as client:
         search_resp = await client.get(
@@ -249,16 +249,38 @@ async def handle_message(request: Request):
     # Step 1 — Fetch real GitHub profiles
     github_profiles = await search_github_developers(
         language=detected_language,
-        min_followers=5,
+        min_followers=1,
         count=num_candidates,
         location=location,
         job_title=job_title
     )
 
+    # Fallback 1: Try without location filter
+    if not github_profiles and location.lower() not in ("remote", ""):
+        print(f"⚠️ No results for location={location}, trying without location filter")
+        github_profiles = await search_github_developers(
+            language=detected_language,
+            min_followers=2,
+            count=num_candidates,
+            location="",
+            job_title=job_title
+        )
+
+    # Fallback 2: Try with default python if no results
+    if not github_profiles and detected_language != "python":
+        print(f"⚠️ No results for language={detected_language}, falling back to python")
+        github_profiles = await search_github_developers(
+            language="python",
+            min_followers=2,
+            count=num_candidates,
+            location="",
+            job_title=job_title
+        )
+
     if not github_profiles:
         return JSONResponse(content={
             "jsonrpc": "2.0", "id": body.get("id", "req-001"),
-            "error": {"code": -32000, "message": "No GitHub profiles found. Check GitHub token."}
+            "error": {"code": -32000, "message": "No GitHub profiles found. GitHub API may be rate limited — try again in 1 minute."}
         })
 
     # Step 2 — AI enrichment (match score + salary only)
