@@ -37,9 +37,17 @@
     .ac-time{font-size:11px;color:var(--muted)}
     .btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);text-decoration:none}
     .btn:hover{border-color:var(--purple);color:var(--violet)}
+    .btn-del{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(248,113,113,0.3);background:rgba(248,113,113,0.08);color:var(--red);margin-left:4px}
+    .btn-del:hover{background:rgba(248,113,113,0.2)}
+    .btn-dis{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:var(--amber);margin-left:4px}
+    .btn-dis:hover{background:rgba(245,158,11,0.2)}
+    .btn-en{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(16,185,129,0.3);background:rgba(16,185,129,0.08);color:var(--green);margin-left:4px}
+    .btn-en:hover{background:rgba(16,185,129,0.2)}
     .reg-btn{background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:9px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none}
     .empty{text-align:center;padding:60px;color:var(--muted)}
     .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .toast{position:fixed;bottom:24px;right:24px;background:#1a0d3d;border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;color:var(--text);z-index:999;display:none;animation:fadein .3s}
+    @keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   </style>
 </head>
 <body>
@@ -102,7 +110,15 @@
       </div>
       <div class="ac-footer">
         <span class="ac-time">Registered {{ agent.registered_at|string|truncate(10,True,'') }}</span>
-        <a href="/agents/{{ agent.name }}" class="btn">View →</a>
+        <div style="display:flex;align-items:center;gap:4px">
+          <a href="/agents/{{ agent.name }}" class="btn">View →</a>
+          {% if agent.status == 'active' %}
+          <button class="btn-dis" onclick="disableAgent('{{ agent.name }}', this)">⏸ Disable</button>
+          {% else %}
+          <button class="btn-en" onclick="enableAgent('{{ agent.name }}', this)">▶ Enable</button>
+          {% endif %}
+          <button class="btn-del" onclick="deleteAgent('{{ agent.name }}', this)">🗑 Delete</button>
+        </div>
       </div>
     </div>
   {% endfor %}
@@ -115,5 +131,75 @@
   </div>
   {% endif %}
 </div>
+<div class="toast" id="toast"></div>
+<script>
+function showToast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.color = color;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+async function deleteAgent(name, btn) {
+  if (!confirm(`Delete "${name}" from registry? This cannot be undone.`)) return;
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch(`/registry/agents/${encodeURIComponent(name)}`, {method:'DELETE'});
+    if (r.ok) {
+      showToast(`✅ ${name} deleted`);
+      btn.closest('.agent-card').style.transition = 'opacity .4s';
+      btn.closest('.agent-card').style.opacity = '0';
+      setTimeout(() => { btn.closest('.agent-card').remove(); updateCount(); }, 400);
+    } else {
+      showToast('❌ Delete failed', 'var(--red)');
+      btn.disabled = false; btn.textContent = '🗑 Delete';
+    }
+  } catch(e) { showToast('❌ Error: ' + e.message, 'var(--red)'); btn.disabled = false; }
+}
+
+async function disableAgent(name, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch(`/registry/agents/${encodeURIComponent(name)}/status`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status:'inactive'})
+    });
+    if (r.ok) {
+      showToast(`⏸ ${name} disabled`, 'var(--amber)');
+      btn.className = 'btn-en'; btn.textContent = '▶ Enable';
+      btn.setAttribute('onclick', `enableAgent('${name}', this)`);
+      btn.disabled = false;
+      btn.closest('.agent-card').querySelector('.ac-status').textContent = 'inactive';
+      btn.closest('.agent-card').querySelector('.ac-status').className = 'ac-status';
+      btn.closest('.agent-card').querySelector('.ac-status').style.cssText = 'background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700';
+    } else { showToast('❌ Failed', 'var(--red)'); btn.disabled = false; btn.textContent = '⏸ Disable'; }
+  } catch(e) { showToast('❌ Error', 'var(--red)'); btn.disabled = false; }
+}
+
+async function enableAgent(name, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch(`/registry/agents/${encodeURIComponent(name)}/status`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status:'active'})
+    });
+    if (r.ok) {
+      showToast(`✅ ${name} enabled`, 'var(--green)');
+      btn.className = 'btn-dis'; btn.textContent = '⏸ Disable';
+      btn.setAttribute('onclick', `disableAgent('${name}', this)`);
+      btn.disabled = false;
+      btn.closest('.agent-card').querySelector('.ac-status').textContent = 'active';
+      btn.closest('.agent-card').querySelector('.ac-status').style.cssText = '';
+    } else { showToast('❌ Failed', 'var(--red)'); btn.disabled = false; btn.textContent = '▶ Enable'; }
+  } catch(e) { showToast('❌ Error', 'var(--red)'); btn.disabled = false; }
+}
+
+function updateCount() {
+  const cards = document.querySelectorAll('.agent-card').length;
+  document.querySelector('.n-v').textContent = cards;
+  document.querySelector('.n-g').textContent = cards;
+}
+</script>
 </body>
 </html>

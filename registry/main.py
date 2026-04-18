@@ -131,6 +131,38 @@ async def proxy_agent_card(url: str):
         raise HTTPException(status_code=502, detail=str(e))
 
 
+
+
+# ── Agent Management ──────────────────────────────────────────────────────────
+
+@app.delete("/registry/agents/{name}")
+async def delete_agent(name: str):
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("DELETE FROM agents WHERE name=%s RETURNING id", (name,))
+    row = cur.fetchone()
+    conn.commit(); cur.close(); conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"status": "deleted", "name": name}
+
+
+@app.patch("/registry/agents/{name}/status")
+async def update_agent_status(name: str, request: Request):
+    body   = await request.json()
+    status = body.get("status", "active")
+    if status not in ("active", "inactive"):
+        raise HTTPException(status_code=400, detail="Status must be active or inactive")
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("UPDATE agents SET status=%s, updated_at=NOW() WHERE name=%s RETURNING id",
+                (status, name))
+    row = cur.fetchone()
+    conn.commit(); cur.close(); conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"status": "updated", "name": name, "new_status": status}
+
 # ── UI Pages ──────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
