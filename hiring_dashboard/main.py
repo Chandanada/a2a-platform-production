@@ -78,7 +78,7 @@ async def hire(request: Request):
     step("🔍 Step 1: Querying registry for Candidate Sourcing Agent...")
     agent = await discover_agent("find_candidates")
     if not agent:
-        return JSONResponse({"error": "No sourcing agent registered. Go to localhost:8000/register to register one."}, status_code=404)
+        return JSONResponse({"error": "No sourcing agent registered. Go to the registry /register page to register one."}, status_code=404)
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
 
@@ -116,7 +116,7 @@ async def hire(request: Request):
     step("🔍 Step 7: Querying registry for Background Check Agent...")
     agent = await discover_agent("verify_candidate")
     if not agent:
-        report["status"] = "partial"; step("⚠️ No background check agent found. Register one at localhost:8000/register")
+        report["status"] = "partial"; step("⚠️ No background check agent found. Register one at the registry /register page")
         return JSONResponse(report)
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
@@ -136,176 +136,274 @@ async def hire(request: Request):
     return JSONResponse(report)
 
 
+
+# ── Registry status endpoint (proxied — avoids CORS) ─────────────────────────
+@app.get("/registry-status")
+async def registry_status():
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{REGISTRY_URL}/registry/health", timeout=5.0)
+            return r.json()
+    except Exception:
+        return {"status": "error", "registered_agents": 0}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    return HTMLResponse("""<!DOCTYPE html>
+    reg = REGISTRY_URL
+    return HTMLResponse(f"""<!DOCTYPE html>
 <html>
 <head>
-  <title>Hiring Manager Agent</title>
+  <title>Hiring Manager — A2A Platform</title>
   <style>
-    :root { --bg:#0a0e1a;--card:#1a2235;--border:#1e2d45;--blue:#3b82f6;--green:#10b981;--text:#e2e8f0;--muted:#64748b; }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:40px 20px}
-    .wrap{max-width:760px;margin:0 auto}
-    h1{font-size:26px;font-weight:800;margin-bottom:6px}
-    .sub{color:var(--muted);font-size:14px;margin-bottom:32px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px}
-    .field{margin-bottom:16px}
-    label{display:block;font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:6px}
-    input{width:100%;background:#0a0e1a;border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:13px;outline:none}
-    input:focus{border-color:var(--blue)}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .btn{width:100%;background:var(--blue);color:#fff;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
-    .btn:hover{background:#1d4ed8}
-    .btn:disabled{background:#334155;cursor:not-allowed}
-    .steps{margin-bottom:16px}
-    .step{padding:5px 0;font-size:13px;color:var(--green);border-bottom:1px solid var(--border)}
-    .step:last-child{border:none}
-    pre{font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;background:#0a0e1a;border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:12px}
-    .section-title{font-size:12px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px}
-    #result{display:none}
+    :root{{--bg:#0a0f1e;--card:#111827;--card2:#1a2235;--border:#1e2d45;--purple:#7c3aed;--pink:#ec4899;--violet:#a78bfa;--text:#e2e8f0;--muted:#64748b;--green:#10b981;--red:#f87171;--amber:#f59e0b;--blue:#3b82f6}}
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0}}
+    nav{{background:rgba(10,15,30,0.97);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}}
+    .brand{{display:flex;align-items:center;gap:10px}}
+    .logo{{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:16px}}
+    .brand-name{{font-size:15px;font-weight:800;color:#fff}}
+    .nav-badge{{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}}
+    .nav-links a{{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}}
+    .nav-links a:hover{{color:var(--text);background:rgba(124,58,237,0.1)}}
+    .container{{max-width:900px;margin:0 auto;padding:28px 24px}}
+    h1{{font-size:24px;font-weight:900;margin-bottom:4px}}
+    .sub{{color:var(--muted);font-size:13px;margin-bottom:20px}}
+    .sbar{{padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:13px;font-weight:600}}
+    .sbar.checking{{background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);color:var(--violet)}}
+    .sbar.ok{{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);color:var(--green)}}
+    .sbar.error{{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:var(--red)}}
+    .card{{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;margin-bottom:20px}}
+    .ct{{font-size:12px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}}
+    .g2{{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}}
+    .g3{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}}
+    .f{{display:flex;flex-direction:column;gap:5px}}
+    label{{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}}
+    input,select,textarea{{background:#080c1a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13px;outline:none;width:100%;font-family:inherit}}
+    input:focus,select:focus,textarea:focus{{border-color:var(--purple)}}
+    select option{{background:#111827}}
+    .rbtn{{width:100%;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s}}
+    .rbtn:hover{{opacity:.88}}.rbtn:disabled{{opacity:.4;cursor:not-allowed}}
+    #result{{display:none}}
+    .rc{{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:14px}}
+    .rct{{font-size:12px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}}
+    .step{{padding:5px 0;font-size:13px;border-bottom:1px solid var(--border);color:var(--green)}}
+    .step:last-child{{border:none}}.step.e{{color:var(--red)}}
+    .cand-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px}}
+    .cand-card{{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}}
+    .cand-name{{font-size:14px;font-weight:700;margin-bottom:4px}}
+    .cand-score{{display:inline-block;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}}
+    .cand-detail{{font-size:12px;color:var(--muted);margin-bottom:3px}}
+    a.gh-link{{color:var(--violet);text-decoration:none;font-size:12px;font-weight:600}}
+    a.gh-link:hover{{text-decoration:underline}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>🤖 Hiring Manager Agent</h1>
-  <p class="sub">A2A Client Agent — Discovers remote agents from registry and runs complete 3-step hiring flow</p>
-
-  <div id="registryStatus" style="background:#0f1f3d;border:1px solid #1e3a5f;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#93c5fd">
-    ⏳ Checking registry status...
+<nav>
+  <div class="brand">
+    <div class="logo">🤖</div>
+    <span class="brand-name">Hiring Manager</span>
+    <span class="nav-badge">Google A2A Protocol</span>
   </div>
+  <div class="nav-links" style="display:flex;gap:2px">
+    <a href="{reg}" target="_blank">Registry</a>
+    <a href="{reg}/audit" target="_blank">Audit Logs</a>
+    <a href="{reg}/analytics" target="_blank">Analytics</a>
+  </div>
+</nav>
+<div class="container">
+  <h1>🚀 Hiring Manager</h1>
+  <p class="sub">A2A Client Agent — discovers remote agents from registry and runs complete 3-step hiring flow</p>
+
+  <div id="regBar" class="sbar checking">⏳ Checking registry...</div>
 
   <div class="card">
-    <div class="grid">
-      <div class="field"><label>Job Title</label><input id="job" value="Senior Python Engineer"/></div>
-      <div class="field"><label>Experience (years)</label><input id="exp" type="number" value="5"/></div>
+    <div class="ct">🧑‍💼 Job Requirements</div>
+    <div class="g2">
+      <div class="f"><label>Job Title</label><input id="jt" value="Senior Python Engineer"/></div>
+      <div class="f"><label>Experience (years)</label><input id="exp" type="number" value="5" min="0" max="20"/></div>
     </div>
-    <div class="grid">
-      <div class="field"><label>Location</label><input id="loc" value="Remote"/></div>
-      <div class="field"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI"/></div>
+    <div class="g3">
+      <div class="f">
+        <label>Location</label>
+        <select id="loc">
+          <option value="Remote">Remote</option>
+          <option value="India">India (On-site)</option>
+          <option value="Bangalore">Bangalore</option>
+          <option value="Mumbai">Mumbai</option>
+          <option value="Delhi">Delhi</option>
+          <option value="Hyderabad">Hyderabad</option>
+          <option value="Pune">Pune</option>
+          <option value="Outside India">Outside India</option>
+          <option value="USA">USA</option>
+          <option value="UK">UK</option>
+          <option value="Singapore">Singapore</option>
+          <option value="UAE">UAE</option>
+        </select>
+      </div>
+      <div class="f">
+        <label>No. of Candidates</label>
+        <select id="numcands">
+          <option value="3">3 candidates</option>
+          <option value="5" selected>5 candidates</option>
+          <option value="8">8 candidates</option>
+          <option value="10">10 candidates</option>
+          <option value="15">15 candidates</option>
+        </select>
+      </div>
+      <div class="f"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI, Docker"/></div>
     </div>
-    <button class="btn" id="btn" onclick="run()">🚀 Start Full Hiring Flow (3 Steps)</button>
+    <button class="rbtn" id="btn" onclick="startHiring()">🚀 Start Full Hiring Flow (3 Steps)</button>
   </div>
 
-  <div id="result" style="display:none">
-    <div class="card">
-      <div class="section-title">📊 Flow Progress</div>
-      <div class="steps" id="steps"></div>
+  <div id="result">
+    <div class="rc"><div class="rct">📊 A2A Flow Progress</div><div id="steps"></div></div>
+    <div id="candidatesSection" style="display:none">
+      <div class="rc">
+        <div class="rct">👥 Candidates Found</div>
+        <div id="candidatesGrid" class="cand-grid"></div>
+      </div>
     </div>
-    <div class="card" id="cardCands" style="display:none">
-      <div class="section-title">👥 Sourced Candidates</div>
-      <pre id="outCands"></pre>
+    <div id="scheduleSection" style="display:none">
+      <div class="rc">
+        <div class="rct">📅 Interview Schedule</div>
+        <div id="scheduleContent"></div>
+      </div>
     </div>
-    <div class="card" id="cardSched" style="display:none">
-      <div class="section-title">📅 Interview Schedule</div>
-      <pre id="outSched"></pre>
-    </div>
-    <div class="card" id="cardBg" style="display:none">
-      <div class="section-title">🔍 Background Check Report</div>
-      <pre id="outBg"></pre>
+    <div id="bgSection" style="display:none">
+      <div class="rc">
+        <div class="rct">🔎 Background Checks</div>
+        <div id="bgContent"></div>
+      </div>
     </div>
   </div>
 </div>
-<script>
-// Check registry status on page load
-window.addEventListener('DOMContentLoaded', async () => {
-  const el = document.getElementById('registryStatus');
-  try {
-    const res  = await fetch('http://localhost:8000/registry/health');
-    const data = await res.json();
-    const count = data.registered_agents || 0;
-    if (count === 0) {
-      el.style.background = '#2d1515';
-      el.style.borderColor = '#7f1d1d';
-      el.style.color = '#f87171';
-      el.innerHTML = `❌ <strong>No agents registered yet.</strong> The hiring flow will not work until you register agents. 
-        <a href="http://localhost:8000/register" target="_blank" style="color:#60a5fa;font-weight:600;margin-left:8px">
-          → Register Agents Now
-        </a>`;
-    } else {
-      el.style.background = '#0a2318';
-      el.style.borderColor = '#065f46';
-      el.style.color = '#10b981';
-      el.innerHTML = `✅ <strong>${count} agent(s) registered</strong> and ready. You can start the hiring flow.
-        <a href="http://localhost:8000" target="_blank" style="color:#60a5fa;font-weight:600;margin-left:8px">
-          → View Registry
-        </a>`;
-    }
-  } catch(e) {
-    el.style.background = '#2d1515';
-    el.style.borderColor = '#7f1d1d';
-    el.style.color = '#f87171';
-    el.innerHTML = '❌ Registry is not running. Start the platform using start.bat first.';
-  }
-});
 
-async function run() {
+<script>
+const REGISTRY = '{reg}';
+
+async function checkReg() {{
+  const bar = document.getElementById('regBar');
+  try {{
+    const r = await fetch('/registry-status');
+    const d = await r.json();
+    if (d.status === 'ok' && d.registered_agents > 0) {{
+      bar.className = 'sbar ok';
+      bar.innerHTML = `✅ <strong>${{d.registered_agents}} agents registered.</strong>
+        <a href="${{REGISTRY}}" target="_blank" style="color:var(--green);margin-left:10px;font-weight:600">→ Registry</a>
+        <a href="${{REGISTRY}}/analytics" target="_blank" style="color:var(--green);margin-left:10px;font-weight:600">→ Analytics</a>`;
+    }} else {{
+      bar.className = 'sbar error';
+      bar.innerHTML = `❌ No agents registered. <a href="${{REGISTRY}}/register" target="_blank" style="color:var(--red);margin-left:8px;font-weight:600">→ Register Agents</a>`;
+    }}
+  }} catch(e) {{
+    bar.className = 'sbar error';
+    bar.innerHTML = `❌ Registry not reachable.`;
+  }}
+}}
+window.addEventListener('DOMContentLoaded', checkReg);
+
+function addStep(msg) {{
+  const el = document.getElementById('steps');
+  const d = document.createElement('div');
+  d.className = 'step' + (msg.includes('❌') || msg.includes('Error') ? ' e' : '');
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}}
+
+async function startHiring() {{
   const btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = '⏳ Running...';
+  btn.disabled = true; btn.textContent = '⏳ Running hiring flow...';
   document.getElementById('result').style.display = 'block';
   document.getElementById('steps').innerHTML = '';
-  ['cardCands','cardSched','cardBg'].forEach(id => document.getElementById(id).style.display='none');
+  document.getElementById('candidatesSection').style.display = 'none';
+  document.getElementById('scheduleSection').style.display = 'none';
+  document.getElementById('bgSection').style.display = 'none';
 
-  try {
-    const res  = await fetch('/hire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      job_title: document.getElementById('job').value,
-      experience_years: parseInt(document.getElementById('exp').value),
-      location: document.getElementById('loc').value,
-      notes: document.getElementById('notes').value
-    })});
+  try {{
+    const res = await fetch('/hire', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{
+        job_title:        document.getElementById('jt').value,
+        experience_years: parseInt(document.getElementById('exp').value),
+        location:         document.getElementById('loc').value,
+        num_candidates:   parseInt(document.getElementById('numcands').value),
+        notes:            document.getElementById('notes').value
+      }})
+    }});
     const data = await res.json();
 
-    // Show steps
-    const stepsEl = document.getElementById('steps');
-    if (data.error) {
-      const d = document.createElement('div');
-      d.className='step';
-      d.style.color='#f87171';
-      d.innerHTML = `❌ ${data.error}<br/><br/>
-        <a href="http://localhost:8000/register" target="_blank"
-           style="color:#3b82f6;font-weight:600">
-          → Go to Registry and register your agents first
-        </a>`;
-      stepsEl.appendChild(d);
-    } else {
-      (data.steps||[]).forEach(s => {
-        const d = document.createElement('div');
-        d.className='step';
-        d.style.color = s.includes('❌') || s.includes('⚠️') ? '#f87171' : '#10b981';
-        d.textContent = s;
-        stepsEl.appendChild(d);
-      });
+    if (data.error) {{ addStep('❌ ' + data.error); }}
+    (data.steps || []).forEach(s => addStep(s));
 
-      // Only show sections if data exists
-      if (data.candidates && Object.keys(data.candidates).length > 0) {
-        document.getElementById('cardCands').style.display='block';
-        document.getElementById('outCands').textContent = JSON.stringify(data.candidates, null, 2);
-      }
-      if (data.schedule && Object.keys(data.schedule).length > 0) {
-        document.getElementById('cardSched').style.display='block';
-        document.getElementById('outSched').textContent = JSON.stringify(data.schedule, null, 2);
-      }
-      if (data.background_checks && Object.keys(data.background_checks).length > 0) {
-        document.getElementById('cardBg').style.display='block';
-        document.getElementById('outBg').textContent = JSON.stringify(data.background_checks, null, 2);
-      }
-    }
-  } catch(e) {
-    const d = document.createElement('div');
-    d.className='step'; d.style.color='#f87171';
-    d.textContent = `Network error: ${e.message}`;
-    document.getElementById('steps').appendChild(d);
-  }
+    // Show candidates
+    const cands = data.candidates?.candidates || data.candidates?.result?.candidates || [];
+    if (cands.length > 0) {{
+      document.getElementById('candidatesSection').style.display = 'block';
+      const grid = document.getElementById('candidatesGrid');
+      grid.innerHTML = '';
+      cands.forEach(c => {{
+        const score = c.match_score || c.score || c.ai_match_score || '—';
+        const scoreColor = score >= 8 ? 'var(--green)' : score >= 6 ? 'var(--amber)' : 'var(--muted)';
+        grid.innerHTML += `<div class="cand-card">
+          <div class="cand-name">${{c.name || c.login || 'Unknown'}}</div>
+          <span class="cand-score" style="background:rgba(16,185,129,0.1);color:${{scoreColor}}">Score: ${{score}}/10</span>
+          <div class="cand-detail">🔧 ${{(c.skills || c.top_skills || []).slice(0,4).join(', ') || 'N/A'}}</div>
+          <div class="cand-detail">📍 ${{c.location || 'Unknown'}}</div>
+          ${{c.github_url || c.html_url ? `<a href="${{c.github_url || c.html_url}}" target="_blank" class="gh-link">→ GitHub Profile</a>` : ''}}
+        </div>`;
+      }});
+    }}
 
-  btn.disabled=false; btn.textContent='🚀 Start Full Hiring Flow (3 Steps)';
-}
+    // Show schedule
+    const sched = data.schedule;
+    if (sched && Object.keys(sched).length > 0) {{
+      document.getElementById('scheduleSection').style.display = 'block';
+      const sc = document.getElementById('scheduleContent');
+      const interviews = sched.scheduled_interviews || sched.interviews || [];
+      if (interviews.length > 0) {{
+        sc.innerHTML = interviews.map(i => `<div style="padding:10px;border-bottom:1px solid var(--border);font-size:13px">
+          <strong>${{i.candidate_name || i.name || 'Candidate'}}</strong> — Round 1
+          <span style="color:var(--muted);margin-left:8px">${{i.scheduled_time || i.time || 'Time TBD'}}</span>
+          ${{i.meet_link ? `<a href="https://${{i.meet_link}}" target="_blank" style="color:var(--violet);margin-left:8px;font-weight:600">→ Meet Link</a>` : ''}}
+        </div>`).join('');
+      }} else {{
+        sc.innerHTML = `<pre style="font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${{JSON.stringify(sched,null,2)}}</pre>`;
+      }}
+    }}
+
+    // Show background checks
+    const bg = data.background_checks;
+    if (bg && Object.keys(bg).length > 0) {{
+      document.getElementById('bgSection').style.display = 'block';
+      const bgc = document.getElementById('bgContent');
+      const checks = bg.verification_results || bg.results || [];
+      if (checks.length > 0) {{
+        bgc.innerHTML = checks.map(c => `<div style="padding:10px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between">
+          <strong>${{c.candidate_name || c.name || 'Candidate'}}</strong>
+          <span style="color:${{c.overall_status === 'PASS' || c.status === 'verified' ? 'var(--green)' : 'var(--amber)'}}">
+            ${{c.overall_status || c.status || 'Checked'}}
+          </span>
+        </div>`).join('');
+      }} else {{
+        bgc.innerHTML = `<pre style="font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${{JSON.stringify(bg,null,2)}}</pre>`;
+      }}
+    }}
+
+    checkReg();
+  }} catch(e) {{
+    addStep('❌ Error: ' + e.message);
+  }}
+  btn.disabled = false; btn.textContent = '🚀 Start Full Hiring Flow (3 Steps)';
+}}
 </script>
 </body>
 </html>""")
 
 
-# ── Audit logging helper ──────────────────────────────────────────────────────
-import httpx as _httpx
+# ── Audit logging ─────────────────────────────────────────────────────────────
 import json as _json
 
 async def _log_audit(flow_id, title, subtitle="", location="",
@@ -314,13 +412,12 @@ async def _log_audit(flow_id, title, subtitle="", location="",
                      secondary_data=None, tertiary_data=None,
                      emails_sent_to=None, status="completed"):
     try:
-        reg = os.getenv("REGISTRY_URL", "http://localhost:8000")
-        async with _httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(f"{reg}/registry/audit/create", json={
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(f"{REGISTRY_URL}/registry/audit/create", json={
                 "flow_id": flow_id, "flow_type": flow_type,
                 "title": title, "subtitle": subtitle, "location": location
             })
-            await client.post(f"{reg}/registry/audit/save", json={
+            await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
                 "flow_id": flow_id, "status": status,
                 "agents_used": _json.dumps(agents_used or []),
                 "result_count": result_count,
