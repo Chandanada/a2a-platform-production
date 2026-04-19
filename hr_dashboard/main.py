@@ -225,7 +225,7 @@ def make_accept_token(candidate_name: str, role: str, company: str) -> str:
 
 @app.post("/send-offer-email")
 async def send_offer_email_endpoint(request: Request):
-    """Generate PDF + send offer letter email to candidate."""
+  try:
     body           = await request.json()
     offer_data     = body.get("offer_data", {})
     candidate_email = body.get("candidate_email", "")
@@ -238,23 +238,29 @@ async def send_offer_email_endpoint(request: Request):
     role           = ol.get("role", "Software Engineer")
     company        = ol.get("company_name") or body.get("company_name", "TechCorp India Pvt. Ltd.")
 
-    # Build acceptance URL with token
     token      = make_accept_token(candidate_name, role, company)
     accept_url = f"{HR_DASHBOARD_URL}/accept-offer?token={token}&name={candidate_name.replace(' ','%20')}&role={role.replace(' ','%20')}&company={company.replace(' ','%20')}"
 
-    # Generate PDF
-    pdf_bytes = generate_offer_pdf(ol, company)
+    try:
+        pdf_bytes = generate_offer_pdf(ol, company)
+    except Exception as e:
+        print(f"[PDF gen] error: {e}")
+        pdf_bytes = b""
 
-    # Send email
-    sent = send_offer_email(candidate_email, candidate_name, role, company, pdf_bytes, accept_url)
+    try:
+        sent = send_offer_email(candidate_email, candidate_name, role, company, pdf_bytes, accept_url)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Email failed: {str(e)[:200]}", "accept_url": accept_url})
 
     return JSONResponse({
         "success": sent,
         "email_sent_to": candidate_email,
         "accept_url": accept_url,
         "pdf_generated": len(pdf_bytes) > 0,
-        "message": f"Offer letter emailed to {candidate_email} with PDF and acceptance link" if sent else "Email failed — check GMAIL_SENDER/GMAIL_APP_PASS env vars"
+        "message": f"Offer letter emailed to {candidate_email} with PDF and acceptance link" if sent else "Email failed — check GMAIL_SENDER/GMAIL_APP_PASS env vars on Render"
     })
+  except Exception as e:
+    return JSONResponse({"success": False, "error": f"Server error: {str(e)[:200]}"})
 
 
 @app.get("/accept-offer")
