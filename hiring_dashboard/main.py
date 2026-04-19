@@ -75,7 +75,7 @@ async def hire(request: Request):
     num_candidates = body.get("num_candidates", 5)
     flow_id        = str(uuid.uuid4())
 
-    report = {"request": body, "steps": [], "candidates": {}, "schedule": {}, "background_checks": {}, "status": "in_progress"}
+    report = {"request": body, "steps": [], "candidates": {}, "schedule": {}, "background_checks": {}, "status": "in_progress", "flow_id": flow_id}
     def step(msg): report["steps"].append(msg)
 
     # STEP 1: Find Candidates
@@ -112,7 +112,7 @@ async def hire(request: Request):
     num_found = len(cands.get("candidates", []))
     step(f"✅ Received {num_found} candidates")
 
-    # STEP 2: Schedule Interviews
+    # STEP 2: Schedule Round 1 ONLY — sequential flow requires HR to clear each round
     step("🔍 Step 3: Querying registry for Interview Scheduler Agent...")
     sched_agent = await discover_agent("schedule_interview")
     schedule = {}
@@ -122,12 +122,12 @@ async def hire(request: Request):
     else:
         surl = sched_agent["supportedInterfaces"][0]["url"]
         step(f"✅ Found: {sched_agent['name']} at {surl}")
-        step("📤 Step 4: Scheduling Round 1 interviews via A2A SendMessage...")
+        step("📤 Step 4: Scheduling Round 1 (HR Screening) via A2A SendMessage...")
         try:
-            sched_data = {**cands, "job_title": job_title, "location": location}
+            sched_data = {**cands, "job_title": job_title, "location": location, "round_number": 1}
             sresp = await send_message(
                 surl,
-                f"Schedule Round 1 interviews for {job_title} candidates.",
+                f"Schedule Round 1 HR Screening interviews for {job_title} candidates.",
                 data=sched_data,
                 timeout=120.0
             )
@@ -139,48 +139,20 @@ async def hire(request: Request):
                 num_sched = len(schedule.get("schedules", []))
                 email_note = schedule.get("email_notifications", [])
                 email_sent = any(e.get("success") for e in email_note)
-                step(f"✅ {num_sched} Round 1 interviews scheduled")
+                step(f"✅ Round 1 (HR Screening) scheduled for {num_sched} candidate(s)")
                 if email_sent:
-                    step("📧 Interview notification emails sent to HR team")
+                    step("📧 Round 1 notification sent to HR team — check email")
                 else:
-                    step("⚠️ Email notifications: Railway SMTP restricted — check logs")
+                    step("⚠️ Email skipped (SMTP not configured or failed)")
         except Exception as e:
-            step(f"⚠️ Scheduler: {str(e)[:100]}")
+            step(f"⚠️ Scheduler error: {str(e)[:100]}")
 
-    # STEP 3: Background Checks — only for candidates who cleared Round 1
-    # Per correct hiring flow: Source → Schedule → Background Check → Offer
-    step("🔍 Step 5: Querying registry for Background Check Agent...")
-    bg_agent = await discover_agent("verify_candidate")
-    if not bg_agent:
-        report["status"] = "partial"
-        step("⚠️ No background check agent found — skipping")
-    else:
-        bgurl = bg_agent["supportedInterfaces"][0]["url"]
-        step(f"✅ Found: {bg_agent['name']} at {bgurl}")
-        # Only run bg check on candidates who have interviews scheduled
-        scheduled_logins = set()
-        if schedule.get("schedules"):
-            scheduled_logins = {s.get("github_login","") for s in schedule["schedules"]}
-            shortlisted = {
-                "candidates": [c for c in cands.get("candidates",[])
-                               if c.get("github_login","") in scheduled_logins or not scheduled_logins],
-                "job_title": job_title
-            }
-            step(f"📤 Step 6: Running background checks for {len(shortlisted['candidates'])} shortlisted candidates...")
-        else:
-            shortlisted = {**cands, "job_title": job_title}
-            step("📤 Step 6: Running background checks for all candidates...")
-        try:
-            bgresp = await send_message(bgurl, f"Run background checks for shortlisted {job_title} candidates.", data=shortlisted)
-            checks = extract_artifact(bgresp)
-            report["background_checks"] = checks
-            passed = sum(1 for c in checks.get("results",[]) if c.get("overall_status") == "PASS")
-            step(f"✅ Background checks complete — {passed} candidates cleared")
-        except Exception as e:
-            step(f"⚠️ Background check error: {str(e)[:80]}")
-
-    report["status"] = "completed"
-    step("🎉 Full hiring flow completed — Source → Schedule → Background Check done!")
+    # ⚡ IMPORTANT: Background check is NOT run here.
+    # Flow: Round 1 cleared → Round 2 → Round 3 → Background Check
+    # HR triggers each next step manually via the dashboard buttons.
+    report["status"] = "awaiting_round_1"
+    step("⏳ Awaiting HR to clear Round 1 before proceeding to Round 2")
+    step("💡 Use the dashboard buttons below to advance through rounds")
 
     # Log to audit
     try:
@@ -192,18 +164,129 @@ async def hire(request: Request):
                 "location": location, "experience_years": experience
             })
             await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
-                "flow_id": flow_id, "status": "completed",
-                "agents_used": _json.dumps(["Sourcing Agent","Scheduler Agent","Background Agent"]),
+                "flow_id": flow_id, "status": "in_progress",
+                "agents_used": _json.dumps(["Sourcing Agent", "Scheduler Agent (Round 1)"]),
                 "result_count": num_found,
                 "result_data": _json.dumps(cands),
-                "secondary_data": _json.dumps(report.get("schedule",{})),
-                "tertiary_data": _json.dumps(report.get("background_checks",{})),
-                "completed_at": "now"
+                "secondary_data": _json.dumps(schedule),
             })
     except Exception as e:
         print(f"Audit log error: {e}")
 
     return JSONResponse(report)
+
+
+@app.post("/schedule-round")
+async def schedule_round(request: Request):
+    """Advance to the next interview round — called by HR after clearing previous round."""
+    body         = await request.json()
+    round_number = int(body.get("round_number", 2))
+    candidates   = body.get("candidates", [])
+    role         = body.get("role", "Software Engineer")
+    flow_id      = body.get("flow_id", str(uuid.uuid4()))
+
+    steps = []
+    def step(msg): steps.append(msg)
+
+    round_names = {1: "HR Screening", 2: "Technical Interview", 3: "Final Round"}
+    round_name  = round_names.get(round_number, f"Round {round_number}")
+
+    step(f"🔍 Querying registry for Interview Scheduler Agent...")
+    sched_agent = await discover_agent("schedule_interview")
+    if not sched_agent:
+        return JSONResponse({"success": False, "steps": steps, "error": "No scheduler agent found"})
+
+    surl = sched_agent["supportedInterfaces"][0]["url"]
+    step(f"✅ Found scheduler: {surl}")
+    step(f"📤 Scheduling Round {round_number} ({round_name})...")
+
+    try:
+        data = {"candidates": candidates, "role": role, "round_number": round_number}
+        sresp = await send_message(
+            surl,
+            f"Schedule Round {round_number} {round_name} interviews for {role} candidates.",
+            data=data,
+            timeout=120.0
+        )
+        if sresp.get("error") and "result" not in sresp:
+            return JSONResponse({"success": False, "steps": steps, "error": sresp.get("error", "")})
+
+        schedule = extract_artifact(sresp)
+        email_note = schedule.get("email_notifications", [])
+        email_sent = any(e.get("success") for e in email_note)
+        step(f"✅ Round {round_number} ({round_name}) scheduled for {len(schedule.get('schedules',[]))} candidate(s)")
+        if email_sent:
+            step(f"📧 Round {round_number} notification sent to HR team")
+
+        # Update audit
+        try:
+            import json as _json
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
+                    "flow_id": flow_id,
+                    "status": "in_progress" if round_number < 3 else "rounds_complete",
+                    "secondary_data": _json.dumps(schedule),
+                })
+        except Exception:
+            pass
+
+        return JSONResponse({
+            "success": True,
+            "steps": steps,
+            "schedule": schedule,
+            "round_number": round_number,
+            "next_round": round_number + 1 if round_number < 3 else None,
+            "flow_complete": round_number == 3
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "steps": steps, "error": str(e)})
+
+
+@app.post("/run-background-check")
+async def run_background_check(request: Request):
+    """Run background verification — only called after all 3 interview rounds are cleared."""
+    body       = await request.json()
+    candidates = body.get("candidates", [])
+    role       = body.get("role", "Software Engineer")
+    flow_id    = body.get("flow_id", str(uuid.uuid4()))
+
+    steps = []
+    def step(msg): steps.append(msg)
+
+    step("🔍 Querying registry for Background Check Agent...")
+    bg_agent = await discover_agent("verify_candidate")
+    if not bg_agent:
+        return JSONResponse({"success": False, "steps": steps, "error": "No background check agent found"})
+
+    bgurl = bg_agent["supportedInterfaces"][0]["url"]
+    step(f"✅ Found: {bg_agent['name']} at {bgurl}")
+    step(f"📤 Running background checks for {len(candidates)} candidate(s) who cleared all 3 rounds...")
+
+    try:
+        data   = {"candidates": candidates, "job_title": role}
+        bgresp = await send_message(bgurl, f"Run background checks for {role} candidates who cleared all interview rounds.", data=data, timeout=120.0)
+        checks = extract_artifact(bgresp)
+        passed = sum(1 for c in checks.get("results", []) if c.get("overall_status") == "PASS")
+        step(f"✅ Background checks complete — {passed}/{len(candidates)} cleared")
+
+        # Final audit update
+        try:
+            import json as _json
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
+                    "flow_id": flow_id,
+                    "status": "completed",
+                    "tertiary_data": _json.dumps(checks),
+                    "completed_at": "now",
+                    "agents_used": _json.dumps(["Sourcing Agent", "Scheduler Agent", "Background Agent"])
+                })
+        except Exception:
+            pass
+
+        return JSONResponse({"success": True, "steps": steps, "background_checks": checks, "passed": passed})
+    except Exception as e:
+        return JSONResponse({"success": False, "steps": steps, "error": str(e)})
+
 
 
 @app.get("/registry-status")
@@ -323,27 +406,80 @@ async def home():
       </div>
       <div class="f"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI, Docker"/></div>
     </div>
-    <button class="rbtn" id="btn" onclick="startHiring()">🚀 Start Full Hiring Flow (3 Steps)</button>
+    <button class="rbtn" id="btn" onclick="startHiring()">🚀 Start Hiring Flow (Source + Round 1)</button>
   </div>
 
   <div id="result">
     <div class="rc"><div class="rct">📊 A2A Flow Progress</div><div id="steps"></div></div>
+
     <div id="candidatesSection" style="display:none">
       <div class="rc">
         <div class="rct">👥 Candidates Found</div>
         <div id="candidatesGrid" class="cand-grid"></div>
       </div>
     </div>
-    <div id="scheduleSection" style="display:none">
+
+    <!-- Round 1 -->
+    <div id="round1Section" style="display:none">
       <div class="rc">
-        <div class="rct">📅 Interview Schedule</div>
-        <div id="scheduleContent"></div>
+        <div class="rct">📅 Round 1 — HR Screening</div>
+        <div id="round1Content"></div>
+        <div style="margin-top:16px;padding:14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px">
+          <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">⚡ HR Screening email sent. After interviewing, mark result below:</p>
+          <div style="display:flex;gap:10px">
+            <button onclick="advanceRound(2)" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
+              ✅ Round 1 Cleared → Schedule Round 2 (Technical)
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Round 2 -->
+    <div id="round2Section" style="display:none">
+      <div class="rc">
+        <div class="rct">💻 Round 2 — Technical Interview</div>
+        <div id="round2Content"></div>
+        <div style="margin-top:16px;padding:14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px">
+          <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">⚡ Technical Interview email sent. After interviewing, mark result below:</p>
+          <div style="display:flex;gap:10px">
+            <button onclick="advanceRound(3)" style="flex:1;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
+              ✅ Round 2 Cleared → Schedule Round 3 (Final Round)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Round 3 -->
+    <div id="round3Section" style="display:none">
+      <div class="rc">
+        <div class="rct">🏁 Round 3 — Final Round</div>
+        <div id="round3Content"></div>
+        <div style="margin-top:16px;padding:14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px">
+          <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">⚡ Final Round email sent. After interviewing, trigger background verification:</p>
+          <div style="display:flex;gap:10px">
+            <button onclick="runBgCheck()" style="flex:1;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
+              ✅ Round 3 Cleared → Run Background Verification
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background Check -->
     <div id="bgSection" style="display:none">
       <div class="rc">
-        <div class="rct">🔎 Background Checks</div>
+        <div class="rct">🔎 Background Verification</div>
         <div id="bgContent"></div>
+      </div>
+    </div>
+
+    <!-- Pipeline Progress Bar -->
+    <div id="pipelineBar" style="display:none;margin-top:8px">
+      <div class="rc">
+        <div class="rct">🗺️ Hiring Pipeline</div>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding-top:8px" id="pipelineSteps"></div>
       </div>
     </div>
   </div>
@@ -351,6 +487,7 @@ async def home():
 
 <script>
 const REGISTRY = '{reg}';
+let _flowData = {{}}; // stored globally for round advancement
 
 async function checkReg() {{
   const bar = document.getElementById('regBar');
@@ -382,14 +519,57 @@ function addStep(msg) {{
   el.scrollTop = el.scrollHeight;
 }}
 
+function renderSchedule(sched, containerId) {{
+  const el = document.getElementById(containerId);
+  if (!sched || !sched.schedules) {{
+    el.innerHTML = `<pre style="font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${{JSON.stringify(sched,null,2)}}</pre>`;
+    return;
+  }}
+  el.innerHTML = sched.schedules.map(s => {{
+    const r = (s.interview_rounds || [])[0] || {{}};
+    return `<div style="padding:12px;border-bottom:1px solid var(--border);font-size:13px">
+      <strong style="color:var(--text)">${{s.candidate_name}}</strong>
+      <span style="color:var(--muted);margin-left:8px">→ ${{r.type || 'Interview'}}</span><br/>
+      <span style="color:var(--muted);font-size:12px">
+        📅 ${{r.date || 'TBD'}} at ${{r.time || 'TBD'}} (${{r.duration || ''}})<br/>
+        👤 ${{r.interviewer || ''}}<br/>
+        🎥 ${{r.format || ''}}
+      </span>
+    </div>`;
+  }}).join('');
+}}
+
+function updatePipeline(currentStep) {{
+  document.getElementById('pipelineBar').style.display = 'block';
+  const steps = [
+    {{label:'Source', icon:'🔍'}},
+    {{label:'Round 1\nHR Screen', icon:'📅'}},
+    {{label:'Round 2\nTechnical', icon:'💻'}},
+    {{label:'Round 3\nFinal', icon:'🏁'}},
+    {{label:'Background\nCheck', icon:'🔎'}},
+    {{label:'Offer', icon:'🎉'}}
+  ];
+  const el = document.getElementById('pipelineSteps');
+  el.innerHTML = steps.map((s, i) => {{
+    const done = i < currentStep;
+    const active = i === currentStep;
+    const bg = done ? '#10b981' : active ? '#7c3aed' : 'rgba(255,255,255,0.05)';
+    const col = done || active ? '#fff' : 'var(--muted)';
+    const border = active ? '2px solid #a78bfa' : '1px solid var(--border)';
+    return `<div style="flex:1;min-width:80px;text-align:center;background:${{bg}};border:${{border}};color:${{col}};border-radius:10px;padding:8px 4px;font-size:11px;font-weight:${{active?700:400}}">
+      ${{s.icon}}<br/><span style="white-space:pre">${{s.label}}</span>
+    </div>
+    ${{i < steps.length-1 ? '<div style="color:var(--muted);font-size:18px">›</div>' : ''}}`;
+  }}).join('');
+}}
+
 async function startHiring() {{
   const btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = '⏳ Running hiring flow...';
+  btn.disabled = true; btn.textContent = '⏳ Sourcing candidates + scheduling Round 1...';
   document.getElementById('result').style.display = 'block';
   document.getElementById('steps').innerHTML = '';
-  document.getElementById('candidatesSection').style.display = 'none';
-  document.getElementById('scheduleSection').style.display = 'none';
-  document.getElementById('bgSection').style.display = 'none';
+  ['candidatesSection','round1Section','round2Section','round3Section','bgSection','pipelineBar']
+    .forEach(id => document.getElementById(id).style.display = 'none');
 
   try {{
     const res = await fetch('/hire', {{
@@ -404,69 +584,144 @@ async function startHiring() {{
       }})
     }});
     const data = await res.json();
+    _flowData = data; // store for later round advancement
 
     if (data.error) {{ addStep('❌ ' + data.error); }}
     (data.steps || []).forEach(s => addStep(s));
 
     // Show candidates
-    const cands = data.candidates?.candidates || data.candidates?.result?.candidates || [];
+    const cands = data.candidates?.candidates || [];
     if (cands.length > 0) {{
       document.getElementById('candidatesSection').style.display = 'block';
       const grid = document.getElementById('candidatesGrid');
-      grid.innerHTML = '';
-      cands.forEach(c => {{
+      grid.innerHTML = cands.map(c => {{
         const score = c.match_score || c.score || c.ai_match_score || '—';
         const scoreColor = score >= 8 ? 'var(--green)' : score >= 6 ? 'var(--amber)' : 'var(--muted)';
-        grid.innerHTML += `<div class="cand-card">
+        return `<div class="cand-card">
           <div class="cand-name">${{c.name || c.login || 'Unknown'}}</div>
-          <span class="cand-score" style="background:rgba(16,185,129,0.1);color:${{scoreColor}}">Score: ${{score}}/10</span>
+          <span class="cand-score" style="color:${{scoreColor}}">Score: ${{score}}/10</span>
           <div class="cand-detail">🔧 ${{(c.skills || c.top_skills || []).slice(0,4).join(', ') || 'N/A'}}</div>
           <div class="cand-detail">📍 ${{c.location || 'Unknown'}}</div>
           ${{c.github_url || c.html_url ? `<a href="${{c.github_url || c.html_url}}" target="_blank" class="gh-link">→ GitHub Profile</a>` : ''}}
         </div>`;
-      }});
+      }}).join('');
     }}
 
-    // Show schedule
+    // Show Round 1 schedule
     const sched = data.schedule;
-    if (sched && Object.keys(sched).length > 0) {{
-      document.getElementById('scheduleSection').style.display = 'block';
-      const sc = document.getElementById('scheduleContent');
-      const interviews = sched.scheduled_interviews || sched.interviews || [];
-      if (interviews.length > 0) {{
-        sc.innerHTML = interviews.map(i => `<div style="padding:10px;border-bottom:1px solid var(--border);font-size:13px">
-          <strong>${{i.candidate_name || i.name || 'Candidate'}}</strong> — Round 1
-          <span style="color:var(--muted);margin-left:8px">${{i.scheduled_time || i.time || 'Time TBD'}}</span>
-          ${{i.meet_link ? `<a href="https://${{i.meet_link}}" target="_blank" style="color:var(--violet);margin-left:8px;font-weight:600">→ Meet Link</a>` : ''}}
-        </div>`).join('');
-      }} else {{
-        sc.innerHTML = `<pre style="font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${{JSON.stringify(sched,null,2)}}</pre>`;
-      }}
-    }}
-
-    // Show background checks
-    const bg = data.background_checks;
-    if (bg && Object.keys(bg).length > 0) {{
-      document.getElementById('bgSection').style.display = 'block';
-      const bgc = document.getElementById('bgContent');
-      const checks = bg.verification_results || bg.results || [];
-      if (checks.length > 0) {{
-        bgc.innerHTML = checks.map(c => `<div style="padding:10px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between">
-          <strong>${{c.candidate_name || c.name || 'Candidate'}}</strong>
-          <span style="color:${{c.overall_status === 'PASS' || c.status === 'verified' ? 'var(--green)' : 'var(--amber)'}}">
-            ${{c.overall_status || c.status || 'Checked'}}
-          </span>
-        </div>`).join('');
-      }} else {{
-        bgc.innerHTML = `<pre style="font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${{JSON.stringify(bg,null,2)}}</pre>`;
-      }}
+    if (sched && sched.schedules?.length > 0) {{
+      document.getElementById('round1Section').style.display = 'block';
+      renderSchedule(sched, 'round1Content');
+      updatePipeline(1);
     }}
 
     checkReg();
   }} catch(e) {{
     addStep('❌ Error: ' + e.message);
   }}
-  btn.disabled = false; btn.textContent = '🚀 Start Full Hiring Flow (3 Steps)';
+  btn.disabled = false; btn.textContent = '🚀 Start Hiring Flow (Source + Round 1)';
+}}
+
+async function advanceRound(roundNumber) {{
+  const candidates = _flowData.candidates?.candidates || [];
+  const role = _flowData.request?.job_title || 'Software Engineer';
+  const flowId = _flowData.flow_id || '';
+
+  const roundNames = {{2: 'Technical Interview', 3: 'Final Round'}};
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = `⏳ Scheduling Round ${{roundNumber}} (${{roundNames[roundNumber]}})...`;
+
+  addStep(`⏳ HR cleared Round ${{roundNumber-1}} → scheduling Round ${{roundNumber}} (${{roundNames[roundNumber]}})...`);
+
+  try {{
+    const res = await fetch('/schedule-round', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{ round_number: roundNumber, candidates, role, flow_id: flowId }})
+    }});
+    const data = await res.json();
+    (data.steps || []).forEach(s => addStep(s));
+
+    if (!data.success) {{
+      addStep('❌ ' + (data.error || 'Failed to schedule round'));
+      btn.disabled = false;
+      btn.textContent = `Retry`;
+      return;
+    }}
+
+    const sectionId = `round${{roundNumber}}Section`;
+    const contentId = `round${{roundNumber}}Content`;
+    document.getElementById(sectionId).style.display = 'block';
+    renderSchedule(data.schedule, contentId);
+    updatePipeline(roundNumber);
+
+    // Scroll to new section
+    document.getElementById(sectionId).scrollIntoView({{behavior:'smooth'}});
+
+    // Disable the "advance" button on the previous section — already acted
+    btn.textContent = `✅ Round ${{roundNumber-1}} Cleared`;
+    btn.style.background = '#374151';
+    btn.style.cursor = 'not-allowed';
+
+  }} catch(e) {{
+    addStep('❌ ' + e.message);
+    btn.disabled = false;
+  }}
+}}
+
+async function runBgCheck() {{
+  const candidates = _flowData.candidates?.candidates || [];
+  const role = _flowData.request?.job_title || 'Software Engineer';
+  const flowId = _flowData.flow_id || '';
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Running background verification...';
+
+  addStep('⏳ All rounds cleared → triggering background verification...');
+
+  try {{
+    const res = await fetch('/run-background-check', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{ candidates, role, flow_id: flowId }})
+    }});
+    const data = await res.json();
+    (data.steps || []).forEach(s => addStep(s));
+
+    if (!data.success) {{
+      addStep('❌ ' + (data.error || 'Background check failed'));
+      btn.disabled = false;
+      return;
+    }}
+
+    document.getElementById('bgSection').style.display = 'block';
+    const bgc = document.getElementById('bgContent');
+    const checks = data.background_checks?.verification_results || data.background_checks?.results || [];
+    if (checks.length > 0) {{
+      bgc.innerHTML = checks.map(c => `<div style="padding:10px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between">
+        <strong>${{c.candidate_name || c.name || 'Candidate'}}</strong>
+        <span style="color:${{c.overall_status === 'PASS' || c.status === 'verified' ? 'var(--green)' : 'var(--amber)'}}">
+          ${{c.overall_status || c.status || 'Checked'}}
+        </span>
+      </div>`).join('');
+    }} else {{
+      bgc.innerHTML = `<pre style="font-size:11px;color:var(--muted);white-space:pre-wrap">${{JSON.stringify(data.background_checks,null,2)}}</pre>`;
+    }}
+
+    updatePipeline(4);
+    document.getElementById('bgSection').scrollIntoView({{behavior:'smooth'}});
+    addStep('🎉 Full hiring pipeline complete — Source → R1 → R2 → R3 → Background Check!');
+
+    btn.textContent = '✅ Verification Complete';
+    btn.style.background = '#374151';
+    btn.style.cursor = 'not-allowed';
+
+  }} catch(e) {{
+    addStep('❌ ' + e.message);
+    btn.disabled = false;
+  }}
 }}
 </script>
 </body>

@@ -10,7 +10,8 @@ from fastapi.templating import Jinja2Templates
 from database import (init_db, verify_api_key, register_agent, get_all_agents,
                       get_agent_by_name, discover_agents_by_skill,
                       create_audit_log, update_audit_log,
-                      get_audit_logs, get_audit_log, get_analytics)
+                      get_audit_logs, get_audit_log, get_analytics,
+                      get_connection)
 
 app = FastAPI(title="A2A Registry", version="1.0.0")
 templates = Jinja2Templates(directory="templates")

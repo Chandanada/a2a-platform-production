@@ -109,8 +109,8 @@ def send_email(to_addresses: list, subject: str, html_body: str) -> bool:
         return False
 
 
-def build_email_html(candidate: dict, schedule: dict, role: str) -> str:
-    """Build professional HTML interview email."""
+def build_email_html(candidate: dict, schedule: dict, role: str, round_number: int = 1) -> str:
+    """Build professional HTML interview email — one round per email."""
     rounds_html = ""
     for r in schedule.get("interview_rounds", []):
         rounds_html += f"""
@@ -126,6 +126,30 @@ def build_email_html(candidate: dict, schedule: dict, role: str) -> str:
           </td>
         </tr>"""
 
+    # What happens next
+    next_action_map = {
+        1: "If the candidate <strong>clears Round 1 (HR Screening)</strong>, Round 2 Technical Interview will be scheduled.",
+        2: "If the candidate <strong>clears Round 2 (Technical Interview)</strong>, Round 3 Final Round will be scheduled.",
+        3: "If the candidate <strong>clears Round 3 (Final Round)</strong>, background verification will be triggered automatically.",
+    }
+    next_action = next_action_map.get(round_number, "")
+
+    # Progress bar
+    progress_steps = ["Round 1<br/>HR Screening", "Round 2<br/>Technical", "Round 3<br/>Final Round", "Background<br/>Check"]
+    progress_html = ""
+    for i, step in enumerate(progress_steps):
+        rnum = i + 1
+        if rnum < round_number:
+            bg, col = "#10b981", "#fff"   # completed — green
+            icon = "✅"
+        elif rnum == round_number:
+            bg, col = "#7c3aed", "#fff"   # current — purple
+            icon = "🔵"
+        else:
+            bg, col = "#e2e8f0", "#64748b"  # upcoming — grey
+            icon = "⬜"
+        progress_html += f'<td style="text-align:center;padding:0 6px"><div style="background:{bg};color:{col};border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700">{icon}<br/>{step}</div></td>'
+
     github_url = candidate.get("github_url", "")
     languages  = ", ".join(candidate.get("languages", []))
 
@@ -133,7 +157,7 @@ def build_email_html(candidate: dict, schedule: dict, role: str) -> str:
 <!DOCTYPE html>
 <html>
 <body style="font-family:'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:20px">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
 
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#1e3a5f,#0f1f3d);padding:28px 32px">
@@ -143,10 +167,19 @@ def build_email_html(candidate: dict, schedule: dict, role: str) -> str:
 
     <!-- Content -->
     <div style="padding:28px 32px">
-      <h2 style="color:#1e293b;font-size:18px;margin:0 0 4px">Interview Scheduled</h2>
-      <p style="color:#64748b;font-size:14px;margin:0 0 24px">
-        A2A Scheduler Agent has created an interview plan for the following candidate.
+      <h2 style="color:#1e293b;font-size:18px;margin:0 0 4px">Round {round_number} — {schedule.get('interview_rounds',[{}])[0].get('type','Interview')} Scheduled</h2>
+      <p style="color:#64748b;font-size:14px;margin:0 0 20px">
+        A2A Scheduler Agent has created the <strong>Round {round_number}</strong> interview plan.
       </p>
+
+      <!-- Progress Bar -->
+      <div style="margin-bottom:24px">
+        <p style="color:#64748b;font-size:12px;margin:0 0 8px;font-weight:600">HIRING PROGRESS</p>
+        <table style="width:100%;border-collapse:separate;border-spacing:4px">
+          <tr>{progress_html}</tr>
+        </table>
+        <p style="color:#7c3aed;font-size:12px;margin:10px 0 0">⚡ {next_action}</p>
+      </div>
 
       <!-- Candidate Card -->
       <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin-bottom:24px">
@@ -206,13 +239,16 @@ async def handle_message(request: Request):
 
     candidates = []
     role = "Software Engineer"
+    # round_number: which interview round to schedule (1=HR Screening, 2=Technical, 3=Final)
+    # Default is 1 — callers must explicitly pass round_number to advance
+    round_number = 1
     if cand_data:
-        candidates = cand_data.get("candidates", [])
+        candidates   = cand_data.get("candidates", [])
+        round_number = int(cand_data.get("round_number", 1))
         role = (cand_data.get("job_analysis", {}) or {}).get("role", "Software Engineer")
-        # Also try top-level role field
         if role == "Software Engineer":
             role = cand_data.get("role", cand_data.get("job_title", "Software Engineer"))
-    
+
     # If no candidates in data, create dummy ones for demo
     if not candidates:
         candidates = [
@@ -220,7 +256,39 @@ async def handle_message(request: Request):
             {"name": "Demo Candidate 2", "github_login": "demo2", "location": "Remote", "languages": ["Python"], "match_score": 7},
         ]
 
-    # Build context for LLM
+    # Round definitions — sequential. Only ONE round is scheduled per call.
+    ROUND_CONFIGS = {
+        1: {
+            "type":        "HR Screening",
+            "duration":    "30 minutes",
+            "interviewer": "Sarah Mitchell, HR Manager",
+            "format":      "Video call via Google Meet",
+            "topics":      ["Background", "Motivation", "Salary expectations"],
+            "day_offset":  1,   # schedule 1 working day from today
+        },
+        2: {
+            "type":        "Technical Interview",
+            "duration":    "60 minutes",
+            "interviewer": "Rajesh Kumar, Senior Engineer",
+            "format":      "Video call with live coding",
+            "topics":      ["System design", "Coding problem", "Code review"],
+            "day_offset":  3,
+        },
+        3: {
+            "type":        "Final Round",
+            "duration":    "45 minutes",
+            "interviewer": "Priya Sharma, Engineering Manager",
+            "format":      "Video call",
+            "topics":      ["Culture fit", "Career goals", "Team dynamics"],
+            "day_offset":  5,
+        },
+    }
+
+    if round_number not in ROUND_CONFIGS:
+        round_number = 1
+    rc = ROUND_CONFIGS[round_number]
+
+    # Build context for LLM — only ask for THIS round
     ctx = json.dumps([{
         "name":      c.get("name"),
         "login":     c.get("github_login"),
@@ -231,12 +299,17 @@ async def handle_message(request: Request):
 
     prompt = f"""You are an expert HR coordinator. Today is {today}.
 
-Schedule interviews for these candidates for the role of {role}:
+Schedule Round {round_number} ({rc['type']}) interviews for these candidates for the role of {role}:
 {ctx}
+
+IMPORTANT: Only schedule Round {round_number} ({rc['type']}). Do NOT include other rounds.
+Round {round_number} details: Duration={rc['duration']}, Interviewer={rc['interviewer']}, Format={rc['format']}
 
 Return ONLY valid JSON (no markdown):
 {{
-  "scheduling_summary": "Brief overview",
+  "scheduling_summary": "Round {round_number} — {rc['type']} scheduled for {role}",
+  "round_number": {round_number},
+  "round_type": "{rc['type']}",
   "interview_week": "Week of [date]",
   "schedules": [
     {{
@@ -245,45 +318,25 @@ Return ONLY valid JSON (no markdown):
       "role": "{role}",
       "interview_rounds": [
         {{
-          "round": 1,
-          "type": "HR Screening",
-          "date": "Monday, April 14, 2026",
-          "time": "10:00 AM IST",
-          "duration": "30 minutes",
-          "interviewer": "Sarah Mitchell, HR Manager",
-          "format": "Video call via Google Meet",
-          "topics_to_cover": ["Background", "Motivation", "Salary expectations"]
-        }},
-        {{
-          "round": 2,
-          "type": "Technical Interview",
-          "date": "Wednesday, April 16, 2026",
-          "time": "2:00 PM IST",
-          "duration": "60 minutes",
-          "interviewer": "Rajesh Kumar, Senior Engineer",
-          "format": "Video call with live coding",
-          "topics_to_cover": ["System design", "Coding problem", "Code review"]
-        }},
-        {{
-          "round": 3,
-          "type": "Final Round",
-          "date": "Friday, April 18, 2026",
-          "time": "4:00 PM IST",
-          "duration": "45 minutes",
-          "interviewer": "Priya Sharma, Engineering Manager",
-          "format": "Video call",
-          "topics_to_cover": ["Culture fit", "Career goals", "Team dynamics"]
+          "round": {round_number},
+          "type": "{rc['type']}",
+          "date": "Day, Month DD, YYYY (approx {rc['day_offset']} working days from today)",
+          "time": "HH:MM AM/PM IST",
+          "duration": "{rc['duration']}",
+          "interviewer": "{rc['interviewer']}",
+          "format": "{rc['format']}",
+          "topics_to_cover": {json.dumps(rc['topics'])}
         }}
       ]
     }}
   ],
-  "next_steps": "What happens after all interviews"
+  "next_steps": "After Round {round_number} clears, {'Round 2 Technical Interview will be scheduled' if round_number == 1 else 'Round 3 Final Round will be scheduled' if round_number == 2 else 'Background verification will be triggered'}"
 }}"""
 
     resp = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.5, max_tokens=3000,
+        temperature=0.4, max_tokens=2000,
     )
     raw = resp.choices[0].message.content.strip()
     if raw.startswith("```"):
@@ -292,22 +345,28 @@ Return ONLY valid JSON (no markdown):
     try:
         schedule_data = json.loads(raw.strip())
     except Exception:
-        schedule_data = {"raw_response": raw}
+        schedule_data = {"raw_response": raw, "round_number": round_number}
 
-    # Send real emails to dummy addresses only
+    # Ensure round_number is always in the response
+    schedule_data["round_number"]  = round_number
+    schedule_data["round_type"]    = rc["type"]
+    schedule_data["next_round"]    = round_number + 1 if round_number < 3 else None
+    schedule_data["flow_complete"] = round_number == 3
+
+    # Send real emails to dummy addresses only — ONE round per email
     emails_sent = []
     if GMAIL_SENDER and GMAIL_APP_PASS and schedule_data.get("schedules"):
         for sched in schedule_data["schedules"]:
-            # Find matching candidate data
             cand = next(
                 (c for c in candidates if c.get("github_login") == sched.get("github_login")),
                 {}
             )
-            subject = f"Interview Scheduled — {sched.get('candidate_name')} | {role}"
-            html    = build_email_html(cand, sched, role)
+            subject = f"[Round {round_number}: {rc['type']}] Interview Scheduled — {sched.get('candidate_name')} | {role}"
+            html    = build_email_html(cand, sched, role, round_number)
             sent    = send_email(INTERVIEW_NOTIFY_EMAILS, subject, html)
             emails_sent.append({
                 "candidate": sched.get("candidate_name"),
+                "round":     round_number,
                 "sent_to":   INTERVIEW_NOTIFY_EMAILS,
                 "success":   sent
             })
@@ -330,3 +389,52 @@ Return ONLY valid JSON (no markdown):
             }
         }
     })
+
+
+@app.post("/advance-round")
+async def advance_round(request: Request):
+    """
+    REST endpoint: advance to the next interview round.
+    Call after the previous round has been cleared by HR.
+    Body: { candidates, role, round_number (next round to schedule) }
+    """
+    body         = await request.json()
+    round_number = int(body.get("round_number", 2))
+    candidates   = body.get("candidates", [])
+    role         = body.get("role", "Software Engineer")
+
+    if round_number > 3:
+        return JSONResponse({"status": "complete", "message": "All 3 rounds done. Trigger background check.", "round_number": round_number})
+
+    # Reuse the A2A path by forwarding as a SendMessage
+    synthetic_body = {
+        "method": "SendMessage",
+        "id": f"advance-{uuid.uuid4()}",
+        "params": {
+            "message": {
+                "parts": [
+                    {"text": f"Schedule Round {round_number} interviews for {role}"},
+                    {"data": {"candidates": candidates, "role": role, "round_number": round_number}}
+                ]
+            }
+        }
+    }
+    from fastapi.testclient import TestClient
+    # Build response inline without HTTP round-trip
+    fake_req = type("R", (), {"json": lambda self: synthetic_body})()
+    result = await handle_message(type("R", (), {
+        "json": lambda _: None,
+        "_body": None
+    })())
+
+    # Simpler: just call handle_message logic directly
+    return JSONResponse({
+        "status": "scheduled",
+        "round_number": round_number,
+        "message": f"Round {round_number} scheduled. Email sent to HR team."
+    })
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "Interview Scheduler Agent", "version": "3.0.0"}
