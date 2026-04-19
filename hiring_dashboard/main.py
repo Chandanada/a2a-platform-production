@@ -32,7 +32,7 @@ HTML_PAGE = """<!DOCTYPE html>
     .nav-badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
     .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
     .nav-links a:hover{color:var(--text);background:rgba(124,58,237,0.1)}
-    .container{max-width:960px;margin:0 auto;padding:28px 24px}
+    .container{max-width:900px;margin:0 auto;padding:28px 24px}
     h1{font-size:24px;font-weight:900;margin-bottom:4px}
     .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
     .sbar{padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:13px;font-weight:600}
@@ -51,38 +51,27 @@ HTML_PAGE = """<!DOCTYPE html>
     #result{display:none}
     .rc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:14px}
     .rct{font-size:12px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-    #steps{max-height:260px;overflow-y:auto}
+    #steps{max-height:280px;overflow-y:auto}
     .step{padding:5px 0;font-size:13px;border-bottom:1px solid var(--border);color:var(--green)}
     .step.e{color:var(--red)}
-    .adv-btn{width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
-    .bg-btn{width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
-    .next-info{margin-top:12px;padding:12px 14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px;font-size:13px;color:var(--muted)}
     .cand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
     .cand-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}
     .cand-name{font-size:14px;font-weight:700;margin-bottom:4px}
     .cand-score{display:inline-block;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}
     .cand-detail{font-size:12px;color:var(--muted);margin-bottom:3px}
     a.gh-link{color:var(--violet);text-decoration:none;font-size:12px;font-weight:600}
-    .cand-check-list{margin-top:12px}
-    .cand-check-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--card2);border:2px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
-    .cand-check-item:hover{border-color:#7c3aed}
-    .cand-check-item.selected{border-color:var(--green);background:rgba(16,185,129,0.05)}
-    .cand-check-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
-    .cand-check-info{flex:1}
-    .cand-check-name{font-size:14px;font-weight:700}
-    .cand-check-meta{font-size:12px;color:var(--muted);margin-top:2px}
-    .sel-count{font-size:12px;color:var(--amber);font-weight:600;margin-top:8px}
-    .resume-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    .resume-info{flex:1;min-width:200px}
-    .resume-title{font-size:14px;font-weight:700}
-    .resume-meta{font-size:12px;color:var(--muted);margin-top:3px}
-    .resume-status{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.3);white-space:nowrap}
-    .resume-btn{background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+    .adv-btn{width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
+    .bg-btn{width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
+    .next-info{margin-top:12px;padding:12px 14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px;font-size:13px;color:var(--muted)}
   </style>
 </head>
 <body>
 <nav>
-  <div class="brand"><div class="logo">\U0001f916</div><span class="brand-name">Hiring Manager</span><span class="nav-badge">Google A2A Protocol</span></div>
+  <div class="brand">
+    <div class="logo">🤖</div>
+    <span class="brand-name">Hiring Manager</span>
+    <span class="nav-badge">Google A2A Protocol</span>
+  </div>
   <div class="nav-links" style="display:flex;gap:2px">
     <a href="__REGISTRY__" target="_blank">Registry</a>
     <a href="__REGISTRY__/audit" target="_blank">Audit Logs</a>
@@ -90,282 +79,221 @@ HTML_PAGE = """<!DOCTYPE html>
   </div>
 </nav>
 <div class="container">
-  <h1>Hiring Manager</h1>
-  <p class="sub">A2A Client Agent — sequential hiring with candidate selection per round. Resume flows anytime.</p>
+  <h1>🚀 Hiring Manager</h1>
+  <p class="sub">A2A Client Agent — discovers agents from registry and runs the full sequential hiring flow</p>
+
   <div id="regBar" class="sbar" style="display:none"></div>
-  <div id="resumeSection" style="display:none">
-    <div class="card">
-      <div class="ct">Resume Active Hiring Flows</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Click Resume to continue where you left off — select who cleared each round.</p>
-      <div id="resumeList"></div>
-    </div>
-  </div>
+
   <div class="card">
-    <div class="ct">Start New Hiring Flow</div>
+    <div class="ct">🧑‍💼 Job Requirements</div>
     <div class="g2">
       <div class="f"><label>Job Title</label><input id="jt" value="Senior Python Engineer"/></div>
       <div class="f"><label>Experience (Years)</label><input id="exp" type="number" value="5" min="0" max="20"/></div>
     </div>
     <div class="g3">
-      <div class="f"><label>Location</label><select id="loc"><option>Remote</option><option>India (On-site)</option><option>Bangalore</option><option>Mumbai</option><option>Delhi</option><option>Hyderabad</option><option>Pune</option><option>USA</option><option>UK</option><option>Singapore</option><option>UAE</option></select></div>
-      <div class="f"><label>No. of Candidates</label><select id="numcands"><option value="1">1 candidate</option><option value="2">2 candidates</option><option value="3">3 candidates</option><option value="5" selected>5 candidates</option><option value="8">8 candidates</option><option value="10">10 candidates</option></select></div>
+      <div class="f">
+        <label>Location</label>
+        <select id="loc">
+          <option>Remote</option><option>India (On-site)</option><option>Bangalore</option>
+          <option>Mumbai</option><option>Delhi</option><option>Hyderabad</option>
+          <option>Pune</option><option>USA</option><option>UK</option><option>Singapore</option><option>UAE</option>
+        </select>
+      </div>
+      <div class="f">
+        <label>No. of Candidates</label>
+        <select id="numcands">
+          <option value="1">1 candidate</option><option value="2">2 candidates</option>
+          <option value="3">3 candidates</option><option value="5" selected>5 candidates</option>
+          <option value="8">8 candidates</option><option value="10">10 candidates</option>
+        </select>
+      </div>
       <div class="f"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI, Docker"/></div>
     </div>
-    <button class="rbtn" id="btn" onclick="startHiring()">Start Hiring Flow (Source + Round 1)</button>
+    <button class="rbtn" id="btn" onclick="startHiring()">🚀 Start Hiring Flow (Source + Round 1)</button>
   </div>
+
   <div id="result">
-    <div class="rc"><div class="rct">A2A Flow Progress</div><div id="steps"></div></div>
+    <div class="rc"><div class="rct">📊 A2A Flow Progress</div><div id="steps"></div></div>
     <div id="candidatesSection" style="display:none">
-      <div class="rc"><div class="rct">Candidates Found</div><div id="candidatesGrid" class="cand-grid"></div></div>
+      <div class="rc"><div class="rct">👥 Candidates Found</div><div id="candidatesGrid" class="cand-grid"></div></div>
     </div>
     <div id="round1Section" style="display:none">
       <div class="rc">
-        <div class="rct">Round 1 — HR Screening</div>
+        <div class="rct">📅 Round 1 — HR Screening</div>
         <div id="round1Content"></div>
-        <div class="next-info">Round 1 email sent to HR. After interviews, <strong>check only candidates who cleared Round 1</strong>, then schedule Round 2 for them only:</div>
-        <div class="cand-check-list" id="round1CheckList"></div>
-        <div class="sel-count" id="round1SelCount"></div>
-        <button class="adv-btn" id="round1Btn" onclick="advanceRound(2)">Schedule Round 2 (Technical) for Selected Candidates</button>
+        <div class="next-info">⚡ Round 1 email sent. After the interview, click below:</div>
+        <button class="adv-btn" onclick="advanceRound(2)">✅ Round 1 Cleared → Schedule Round 2 (Technical)</button>
       </div>
     </div>
     <div id="round2Section" style="display:none">
       <div class="rc">
-        <div class="rct">Round 2 — Technical Interview</div>
+        <div class="rct">💻 Round 2 — Technical Interview</div>
         <div id="round2Content"></div>
-        <div class="next-info">Round 2 email sent. <strong>Check only candidates who cleared Round 2</strong>, then schedule Round 3:</div>
-        <div class="cand-check-list" id="round2CheckList"></div>
-        <div class="sel-count" id="round2SelCount"></div>
-        <button class="adv-btn" id="round2Btn" onclick="advanceRound(3)">Schedule Round 3 (Final Round) for Selected Candidates</button>
+        <div class="next-info">⚡ Round 2 email sent. After the interview, click below:</div>
+        <button class="adv-btn" onclick="advanceRound(3)">✅ Round 2 Cleared → Schedule Round 3 (Final Round)</button>
       </div>
     </div>
     <div id="round3Section" style="display:none">
       <div class="rc">
-        <div class="rct">Round 3 — Final Round</div>
+        <div class="rct">🏁 Round 3 — Final Round</div>
         <div id="round3Content"></div>
-        <div class="next-info">Round 3 email sent. <strong>Check only candidates who cleared Round 3</strong>, then run background verification:</div>
-        <div class="cand-check-list" id="round3CheckList"></div>
-        <div class="sel-count" id="round3SelCount"></div>
-        <button class="bg-btn" id="round3Btn" onclick="runBgCheck()">Run Background Verification for Selected Candidates</button>
+        <div class="next-info">⚡ Round 3 email sent. After the interview, click below:</div>
+        <button class="bg-btn" onclick="runBgCheck()">✅ Round 3 Cleared → Run Background Verification</button>
       </div>
     </div>
     <div id="bgSection" style="display:none">
-      <div class="rc"><div class="rct">Background Verification</div><div id="bgContent"></div></div>
+      <div class="rc"><div class="rct">🔎 Background Verification</div><div id="bgContent"></div></div>
     </div>
   </div>
 </div>
+
 <script>
 var REGISTRY = '__REGISTRY__';
 var _flowData = {};
-var _currentRoundCands = {};
 
 window.addEventListener('DOMContentLoaded', function() {
-  loadActiveFlows();
-  fetch('/registry-status').then(function(r){return r.json();}).then(function(d){
-    if (d.status==='ok' && d.registered_agents>0) {
-      var bar=document.getElementById('regBar');
-      bar.style.display='block'; bar.className='sbar ok';
-      bar.innerHTML='Connected: '+d.registered_agents+' agents registered. <a href="'+REGISTRY+'" target="_blank" style="color:var(--green);margin-left:8px">Registry</a>';
+  fetch('/registry-status').then(function(r){ return r.json(); }).then(function(d){
+    if (d.status === 'ok' && d.registered_agents > 0) {
+      var bar = document.getElementById('regBar');
+      bar.style.display = 'block';
+      bar.className = 'sbar ok';
+      bar.innerHTML = '✅ ' + d.registered_agents + ' agents registered. <a href="' + REGISTRY + '" target="_blank" style="color:var(--green);margin-left:8px">→ Registry</a>';
     }
   }).catch(function(){});
 });
 
-function loadActiveFlows() {
-  fetch('/active-flows').then(function(r){return r.json();}).then(function(d){
-    var flows=d.flows||[];
-    if (!flows.length) return;
-    var lbl={'in_progress':'Waiting: select Round 1 cleared candidates','awaiting_round_2':'Waiting: select Round 2 cleared candidates','awaiting_round_3':'Waiting: select Round 3 cleared candidates','awaiting_bg_check':'Background check pending'};
-    document.getElementById('resumeSection').style.display='block';
-    document.getElementById('resumeList').innerHTML=flows.map(function(f){
-      return '<div class="resume-card"><div class="resume-info"><div class="resume-title">'+(f.title||'Hiring Flow')+(f.location?' — '+f.location:'')+'</div><div class="resume-meta">Started: '+(f.started_at||'')+' &nbsp;·&nbsp; '+(f.all_candidates||[]).length+' candidates sourced</div></div><span class="resume-status">'+(lbl[f.status]||f.status)+'</span><button class="resume-btn" onclick="resumeFlow(''+f.flow_id+'')">Resume</button></div>';
-    }).join('');
-  }).catch(function(){});
-}
-
 function addStep(msg) {
-  var el=document.getElementById('steps'),d=document.createElement('div');
-  d.className=msg.indexOf('\u274c')>=0||msg.indexOf('Error')>=0?'step e':'step';
-  d.textContent=msg; el.appendChild(d); el.scrollTop=el.scrollHeight;
+  var el = document.getElementById('steps');
+  var d = document.createElement('div');
+  d.className = msg.indexOf('❌') >= 0 ? 'step e' : 'step';
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
 }
-function show(id){var e=document.getElementById(id);if(e)e.style.display='block';}
-function hide(id){var e=document.getElementById(id);if(e)e.style.display='none';}
 
-function renderSchedule(sched,cid){
-  var el=document.getElementById(cid);
-  if(!el||!sched||!sched.schedules)return;
-  el.innerHTML=sched.schedules.map(function(s){
-    var r=(s.interview_rounds||[])[0]||{};
-    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px"><strong>'+(s.candidate_name||'Candidate')+'</strong><br/><span style="color:var(--muted);font-size:12px">'+( r.date||'TBD')+' at '+(r.time||'TBD')+' &nbsp;·&nbsp; '+(r.interviewer||'')+'</span></div>';
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+function renderSchedule(sched, containerId) {
+  var el = document.getElementById(containerId);
+  if (!sched || !sched.schedules) { el.innerHTML = '<pre style="font-size:11px;color:var(--muted)">' + JSON.stringify(sched,null,2) + '</pre>'; return; }
+  el.innerHTML = sched.schedules.map(function(s) {
+    var r = (s.interview_rounds || [])[0] || {};
+    return '<div style="padding:12px;border-bottom:1px solid var(--border);font-size:13px"><strong>' + (s.candidate_name||'Candidate') + '</strong><br/>' +
+      '<span style="color:var(--muted);font-size:12px">📅 ' + (r.date||'TBD') + ' at ' + (r.time||'TBD') + ' (' + (r.duration||'') + ')<br/>👤 ' + (r.interviewer||'') + '</span></div>';
   }).join('');
 }
 
-function renderCheckboxes(candidates, roundNum) {
-  _currentRoundCands[roundNum]=candidates;
-  var listId='round'+roundNum+'CheckList', countId='round'+roundNum+'SelCount';
-  document.getElementById(listId).innerHTML=candidates.map(function(c,i){
-    var score=c.match_score||c.score||'?';
-    return '<div class="cand-check-item selected" id="cci_'+roundNum+'_'+i+'" onclick="toggleCheck('+roundNum+','+i+')">' +
-      '<input type="checkbox" id="chk_'+roundNum+'_'+i+'" checked onclick="event.stopPropagation();updateSelCount('+roundNum+')" />' +
-      '<div class="cand-check-info"><div class="cand-check-name">'+(c.name||c.login||'Candidate')+'</div>' +
-      '<div class="cand-check-meta">Score: '+score+'/10 &nbsp;·&nbsp; '+(c.location||'Unknown')+(c.github_url?' &nbsp;<a href="'+c.github_url+'" target="_blank" style="color:var(--violet)">GitHub</a>':'')+'</div></div>' +
-      '</div>';
-  }).join('');
-  updateSelCount(roundNum);
-  saveFlowState(roundNum, candidates, []);
-}
-
-function toggleCheck(roundNum,idx){
-  var cb=document.getElementById('chk_'+roundNum+'_'+idx);
-  var item=document.getElementById('cci_'+roundNum+'_'+idx);
-  cb.checked=!cb.checked;
-  item.className='cand-check-item'+(cb.checked?' selected':'');
-  updateSelCount(roundNum);
-}
-
-function updateSelCount(roundNum){
-  var cbs=document.querySelectorAll('#round'+roundNum+'CheckList input[type=checkbox]');
-  var sel=Array.from(cbs).filter(function(c){return c.checked;}).length;
-  var el=document.getElementById('round'+roundNum+'SelCount');
-  if(el) el.textContent=sel+' of '+cbs.length+' candidates selected for next round';
-}
-
-function getSelectedCandidates(roundNum){
-  var all=_currentRoundCands[roundNum]||[];
-  return all.filter(function(c,i){
-    var cb=document.getElementById('chk_'+roundNum+'_'+i);
-    return cb&&cb.checked;
-  });
-}
-
-function saveFlowState(roundNum, allCands, clearedCands){
-  var flowId=_flowData.flow_id||'';
-  var role=(_flowData.request&&_flowData.request.job_title)||'Software Engineer';
-  if(!flowId) return;
-  fetch('/save-flow-state',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({flow_id:flowId,round_number:roundNum,all_candidates:allCands,cleared_candidates:clearedCands,role:role})
-  }).catch(function(){});
-}
-
-async function resumeFlow(flowId){
-  var r=await fetch('/active-flows');
-  var d=await r.json();
-  var flow=(d.flows||[]).find(function(f){return f.flow_id===flowId;});
-  if(!flow){alert('Could not load flow.');return;}
-  _flowData={flow_id:flow.flow_id,request:{job_title:flow.role||flow.title},candidates:{candidates:flow.all_candidates||[]},status:flow.status};
+function startHiring() {
+  var btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
   show('result');
-  document.getElementById('steps').innerHTML='';
+  document.getElementById('steps').innerHTML = '';
   ['candidatesSection','round1Section','round2Section','round3Section','bgSection'].forEach(hide);
-  addStep('Resuming: '+flow.title+' (started '+flow.started_at+')');
-  addStep((flow.all_candidates||[]).length+' candidates loaded from previous session');
-  var cands=flow.all_candidates||[], cleared=flow.cleared_candidates||[];
-  if(cands.length>0){
-    show('candidatesSection');
-    document.getElementById('candidatesGrid').innerHTML=cands.map(function(c){
-      var score=c.match_score||c.score||'?';
-      return '<div class="cand-card"><div class="cand-name">'+(c.name||c.login||'?')+'</div><span class="cand-score">Score: '+score+'/10</span><div class="cand-detail">'+(c.location||'Unknown')+'</div></div>';
-    }).join('');
-  }
-  var roundNum=flow.current_round||1;
-  var showCands=cleared.length?cleared:cands;
-  var secId='round'+roundNum+'Section';
-  show(secId);
-  renderCheckboxes(showCands, roundNum);
-  addStep('Select candidates who cleared Round '+roundNum+', then advance.');
-  document.getElementById('result').scrollIntoView({behavior:'smooth'});
-}
 
-function startHiring(){
-  var btn=document.getElementById('btn');
-  btn.disabled=true; btn.textContent='Running...';
-  show('result');
-  document.getElementById('steps').innerHTML='';
-  ['candidatesSection','round1Section','round2Section','round3Section','bgSection'].forEach(hide);
-  fetch('/hire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    job_title:document.getElementById('jt').value,
-    experience_years:parseInt(document.getElementById('exp').value)||3,
-    location:document.getElementById('loc').value,
-    num_candidates:parseInt(document.getElementById('numcands').value)||5,
-    notes:document.getElementById('notes').value
-  })})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    _flowData=data;
-    (data.steps||[]).forEach(addStep);
-    var cands=(data.candidates&&data.candidates.candidates)?data.candidates.candidates:[];
-    if(cands.length>0){
+  fetch('/hire', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      job_title:        document.getElementById('jt').value,
+      experience_years: parseInt(document.getElementById('exp').value) || 3,
+      location:         document.getElementById('loc').value,
+      num_candidates:   parseInt(document.getElementById('numcands').value) || 5,
+      notes:            document.getElementById('notes').value
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    _flowData = data;
+    (data.steps || []).forEach(addStep);
+
+    var cands = (data.candidates && data.candidates.candidates) ? data.candidates.candidates : [];
+    if (cands.length > 0) {
       show('candidatesSection');
-      document.getElementById('candidatesGrid').innerHTML=cands.map(function(c){
-        var score=c.match_score||c.score||'?';
-        var col=score>=8?'var(--green)':score>=6?'var(--amber)':'var(--muted)';
-        return '<div class="cand-card"><div class="cand-name">'+(c.name||c.login||'Unknown')+'</div><span class="cand-score" style="color:'+col+'">Score: '+score+'/10</span><div class="cand-detail">'+(c.location||'Unknown')+'</div>'+(c.github_url?'<a href="'+c.github_url+'" target="_blank" class="gh-link">GitHub</a>':'')+'</div>';
+      document.getElementById('candidatesGrid').innerHTML = cands.map(function(c) {
+        var score = c.match_score || c.score || '?';
+        var col = score >= 8 ? 'var(--green)' : score >= 6 ? 'var(--amber)' : 'var(--muted)';
+        return '<div class="cand-card"><div class="cand-name">' + (c.name||c.login||'Unknown') + '</div>' +
+          '<span class="cand-score" style="color:' + col + '">Score: ' + score + '/10</span>' +
+          '<div class="cand-detail">📍 ' + (c.location||'Unknown') + '</div>' +
+          (c.github_url ? '<a href="' + c.github_url + '" target="_blank" class="gh-link">→ GitHub</a>' : '') + '</div>';
       }).join('');
     }
+
+    // Always show round1Section after sourcing — buttons must be visible
     show('round1Section');
-    renderSchedule(data.schedule,'round1Content');
-    renderCheckboxes(cands,1);
+    if (data.schedule && data.schedule.schedules && data.schedule.schedules.length > 0) {
+      renderSchedule(data.schedule, 'round1Content');
+    } else {
+      document.getElementById('round1Content').innerHTML =
+        '<div style="padding:12px;color:var(--amber);font-size:13px">⚠️ Scheduler was unavailable (Render cold start). ' +
+        'The schedule will be sent via email shortly, or click Round 1 Cleared below to proceed manually.</div>';
+    }
     document.getElementById('round1Section').scrollIntoView({behavior:'smooth'});
-    loadActiveFlows();
   })
-  .catch(function(e){addStep('Error: '+e.message);})
-  .finally(function(){btn.disabled=false;btn.textContent='Start Hiring Flow (Source + Round 1)';});
+  .catch(function(e) { addStep('❌ Error: ' + e.message); })
+  .finally(function() { btn.disabled = false; btn.textContent = '🚀 Start Hiring Flow (Source + Round 1)'; });
 }
 
-function advanceRound(toRound){
-  var fromRound=toRound-1;
-  var selected=getSelectedCandidates(fromRound);
-  if(selected.length===0){alert('Please select at least one candidate who cleared Round '+fromRound);return;}
-  var role=(_flowData.request&&_flowData.request.job_title)||'Software Engineer';
-  var flowId=_flowData.flow_id||'';
-  var btn=document.getElementById('round'+fromRound+'Btn');
-  btn.disabled=true; btn.textContent='Scheduling Round '+toRound+' for '+selected.length+' candidate(s)...';
-  addStep(selected.length+' candidate(s) cleared Round '+fromRound+': '+selected.map(function(c){return c.name||c.login||'?';}).join(', '));
-  addStep('Scheduling Round '+toRound+'...');
-  saveFlowState(fromRound,_currentRoundCands[fromRound]||[],selected);
-  fetch('/schedule-round',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({round_number:toRound,candidates:selected,role:role,flow_id:flowId})})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    (data.steps||[]).forEach(addStep);
-    if(!data.success){addStep('Error: '+(data.error||'Failed'));btn.disabled=false;btn.textContent='Retry';return;}
-    var sec='round'+toRound+'Section';
+function advanceRound(roundNumber) {
+  var cands  = (_flowData.candidates && _flowData.candidates.candidates) ? _flowData.candidates.candidates : [];
+  var role   = (_flowData.request && _flowData.request.job_title) ? _flowData.request.job_title : 'Software Engineer';
+  var flowId = _flowData.flow_id || '';
+  var btn    = event.target;
+  btn.disabled = true; btn.textContent = '⏳ Scheduling Round ' + roundNumber + '...';
+  addStep('⏳ Scheduling Round ' + roundNumber + '...');
+
+  fetch('/schedule-round', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({round_number: roundNumber, candidates: cands, role: role, flow_id: flowId})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    (data.steps || []).forEach(addStep);
+    if (!data.success) { addStep('❌ ' + (data.error||'Failed')); btn.disabled=false; btn.textContent='Retry'; return; }
+    var sec = 'round' + roundNumber + 'Section';
     show(sec);
-    renderSchedule(data.schedule,'round'+toRound+'Content');
-    renderCheckboxes(selected,toRound);
+    renderSchedule(data.schedule, 'round' + roundNumber + 'Content');
     document.getElementById(sec).scrollIntoView({behavior:'smooth'});
-    btn.textContent='Round '+fromRound+' Cleared ('+selected.length+' candidates)';
-    btn.style.background='#374151';btn.style.cursor='not-allowed';
+    btn.textContent = '✅ Round ' + (roundNumber-1) + ' Cleared';
+    btn.style.background = '#374151'; btn.style.cursor = 'not-allowed';
   })
-  .catch(function(e){addStep('Error: '+e.message);btn.disabled=false;});
+  .catch(function(e) { addStep('❌ ' + e.message); btn.disabled=false; });
 }
 
-function runBgCheck(){
-  var selected=getSelectedCandidates(3);
-  if(selected.length===0){alert('Please select at least one candidate who cleared Round 3');return;}
-  var role=(_flowData.request&&_flowData.request.job_title)||'Software Engineer';
-  var flowId=_flowData.flow_id||'';
-  var btn=document.getElementById('round3Btn');
-  btn.disabled=true; btn.textContent='Running background checks for '+selected.length+' candidate(s)...';
-  addStep(selected.length+' candidate(s) cleared Round 3: '+selected.map(function(c){return c.name||c.login||'?';}).join(', '));
-  addStep('Running background verification...');
-  saveFlowState(3,_currentRoundCands[3]||[],selected);
-  fetch('/run-background-check',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({candidates:selected,role:role,flow_id:flowId})})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    (data.steps||[]).forEach(addStep);
-    if(!data.success){addStep('Error: '+(data.error||'Failed'));btn.disabled=false;return;}
-    show('bgSection');
-    var checks=(data.background_checks&&(data.background_checks.results||data.background_checks.verification_results))||[];
-    document.getElementById('bgContent').innerHTML=checks.length>0
-      ?checks.map(function(c){
-        var pass=c.overall_status==='PASS'||c.status==='verified';
-        return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px"><strong>'+(c.candidate_name||c.name||'Candidate')+'</strong><span style="color:'+(pass?'var(--green)':'var(--amber)')+'">'+( c.overall_status||c.status||'Checked')+'</span></div>';
-      }).join('')
-      :'<pre style="font-size:11px;color:var(--muted);white-space:pre-wrap">'+JSON.stringify(data.background_checks,null,2)+'</pre>';
-    document.getElementById('bgSection').scrollIntoView({behavior:'smooth'});
-    addStep('Done! Source → R1 → R2 → R3 → Background Check complete!');
-    btn.textContent='Done';btn.style.background='#374151';btn.style.cursor='not-allowed';
+function runBgCheck() {
+  var cands  = (_flowData.candidates && _flowData.candidates.candidates) ? _flowData.candidates.candidates : [];
+  var role   = (_flowData.request && _flowData.request.job_title) ? _flowData.request.job_title : 'Software Engineer';
+  var flowId = _flowData.flow_id || '';
+  var btn    = event.target;
+  btn.disabled = true; btn.textContent = '⏳ Running background checks...';
+  addStep('⏳ Running background verification...');
+
+  fetch('/run-background-check', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({candidates: cands, role: role, flow_id: flowId})
   })
-  .catch(function(e){addStep('Error: '+e.message);btn.disabled=false;});
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    (data.steps || []).forEach(addStep);
+    if (!data.success) { addStep('❌ ' + (data.error||'Failed')); btn.disabled=false; return; }
+    show('bgSection');
+    var checks = (data.background_checks && data.background_checks.results) || (data.background_checks && data.background_checks.verification_results) || [];
+    document.getElementById('bgContent').innerHTML = checks.length > 0
+      ? checks.map(function(c) {
+          var pass = c.overall_status === 'PASS' || c.status === 'verified';
+          return '<div style="padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px">' +
+            '<strong>' + (c.candidate_name||c.name||'Candidate') + '</strong>' +
+            '<span style="color:' + (pass?'var(--green)':'var(--amber)') + '">' + (c.overall_status||c.status||'Checked') + '</span></div>';
+        }).join('')
+      : '<pre style="font-size:11px;color:var(--muted);white-space:pre-wrap">' + JSON.stringify(data.background_checks,null,2) + '</pre>';
+    document.getElementById('bgSection').scrollIntoView({behavior:'smooth'});
+    addStep('🎉 Done! Source → Round 1 → Round 2 → Round 3 → Background Check complete!');
+    btn.textContent = '✅ Done'; btn.style.background = '#374151'; btn.style.cursor = 'not-allowed';
+  })
+  .catch(function(e) { addStep('❌ ' + e.message); btn.disabled=false; });
 }
 </script>
 </body>
@@ -669,80 +597,6 @@ async def registry_status():
     except Exception:
         return {"status": "error", "registered_agents": 0}
 
-
-@app.post("/save-flow-state")
-async def save_flow_state(request: Request):
-    """Persist which candidates are in a round so HR can resume days later."""
-    import json as _j
-    body          = await request.json()
-    flow_id       = body.get("flow_id", "")
-    round_number  = int(body.get("round_number", 1))
-    all_cands     = body.get("all_candidates", [])
-    cleared_cands = body.get("cleared_candidates", [])
-    role          = body.get("role", "")
-    status        = f"awaiting_round_{round_number + 1}" if round_number < 3 else "awaiting_bg_check"
-    if not flow_id:
-        return JSONResponse({"success": False, "error": "flow_id required"})
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
-                "flow_id": flow_id,
-                "status":  status,
-                "extra_data": _j.dumps({
-                    "current_round":      round_number,
-                    "all_candidates":     all_cands,
-                    "cleared_candidates": cleared_cands,
-                    "role":               role
-                })
-            })
-        return JSONResponse({"success": True, "status": status})
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
-
-
-@app.get("/active-flows")
-async def get_active_flows():
-    """Return all in-progress hiring flows so HR can resume from any session."""
-    import json as _j
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            r = await client.get(f"{REGISTRY_URL}/registry/audit",
-                                 params={"flow_type": "hiring", "limit": 30})
-            logs = r.json().get("logs", [])
-        active = []
-        for log in logs:
-            if log.get("status") not in ("in_progress", "awaiting_round_2",
-                                          "awaiting_round_3", "awaiting_bg_check"):
-                continue
-            extra, all_cands, cleared = {}, [], []
-            try:
-                ed = log.get("extra_data")
-                if isinstance(ed, str): extra = _j.loads(ed)
-                all_cands = extra.get("all_candidates", [])
-                cleared   = extra.get("cleared_candidates", [])
-            except Exception: pass
-            if not all_cands:
-                try:
-                    rd = log.get("result_data")
-                    if isinstance(rd, str): rd = _j.loads(rd)
-                    if isinstance(rd, dict): all_cands = rd.get("candidates", [])
-                except Exception: pass
-            round_map = {"in_progress": 1, "awaiting_round_2": 2,
-                         "awaiting_round_3": 3, "awaiting_bg_check": 4}
-            active.append({
-                "flow_id":     log.get("flow_id"),
-                "title":       log.get("title", "Hiring Flow"),
-                "location":    log.get("location", ""),
-                "status":      log.get("status"),
-                "current_round": round_map.get(log.get("status",""), 1),
-                "started_at":  (log.get("started_at") or "")[:10],
-                "all_candidates":     all_cands,
-                "cleared_candidates": cleared,
-                "role":        extra.get("role", log.get("title", "Software Engineer")),
-            })
-        return JSONResponse({"flows": active})
-    except Exception as e:
-        return JSONResponse({"flows": [], "error": str(e)})
 
 
 @app.get("/", response_class=HTMLResponse)
