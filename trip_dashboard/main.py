@@ -506,7 +506,7 @@ def _build_ui() -> str:
 
   <!-- Trip type selector -->
   <div class="trip-toggle">
-    <button class="tt-btn active" id="ttCorp" onclick="setTripType('corporate')">
+    <button class="tt-btn" id="ttCorp" onclick="setTripType('corporate')">
       <span class="tt-icon">🏢</span>
       <strong>Corporate Trip</strong>
       <div class="tt-sub">Bill goes to your company for approval. Booking confirmed after company pays.</div>
@@ -639,10 +639,19 @@ const REG='__REG__';
 
 function setTripType(type){
   tripType=type;
-  document.getElementById('ttCorp').className='tt-btn'+(type==='corporate'?' active':'');
-  document.getElementById('ttPers').className='tt-btn'+(type==='personal'?' active':'');
+  var corp=document.getElementById('ttCorp');
+  var pers=document.getElementById('ttPers');
+  // Reset both
+  corp.style.borderColor=''; corp.style.background=''; corp.style.color='';
+  pers.style.borderColor=''; pers.style.background=''; pers.style.color='';
+  // Highlight selected
+  var active = type==='corporate' ? corp : pers;
+  active.style.borderColor='#f59e0b';
+  active.style.background='rgba(245,158,11,0.1)';
+  active.style.color='#fbbf24';
   document.getElementById('approverRow').style.display=type==='corporate'?'flex':'none';
   updateHowBanner();
+  if(sf&&sh) chk();
 }
 
 function updateHowBanner(){
