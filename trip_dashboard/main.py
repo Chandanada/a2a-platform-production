@@ -724,10 +724,26 @@ function selF(i,el){document.querySelectorAll('#flts .oc').forEach(c=>c.classLis
 function selH(i,el){document.querySelectorAll('#htls .oc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');sh=tripData.hotels[i];chk();}
 function chk(){
   if(sf&&sh){
+    // Recalculate from actual selection — not fixed API estimate
+    const exp=tripData.expense_estimate||{};
+    const otherCosts=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
+    const flightCost=sf.total_price_inr||0;
+    const hotelCost=sh.total_cost_inr||0;
+    const newTotal=flightCost+hotelCost+otherCosts;
+    // Update expense block with real numbers
+    document.getElementById('expb').innerHTML=
+      `<div class="er"><span>Flights</span><span>₹${flightCost.toLocaleString('en-IN')}</span></div>`+
+      `<div class="er"><span>Hotel</span><span>₹${hotelCost.toLocaleString('en-IN')}</span></div>`+
+      `<div class="er"><span>Transport+Meals</span><span>₹${otherCosts.toLocaleString('en-IN')}</span></div>`+
+      `<div class="er" style="font-weight:800;color:var(--amber2);font-size:14px"><span>TOTAL</span><span>₹${newTotal.toLocaleString('en-IN')}</span></div>`;
+    // Show confirm section
     document.getElementById('cs').style.display='block';
-    const t=(tripData.expense_estimate?.total_inr||0);
-    document.getElementById('csum').innerHTML=`<strong>${sf.airline} ${sf.flight_number||''}</strong> + <strong>${sh.name||''}</strong><br><span style="color:var(--amber2);font-weight:700">Total: ₹${t.toLocaleString('en-IN')}</span>`;
-  }else{document.getElementById('cs').style.display='none';}
+    document.getElementById('csum').innerHTML=`<strong>${sf.airline} ${sf.flight_number||''}</strong> + <strong>${sh.name||''}</strong><br><span style="color:var(--amber2);font-weight:700">Total: ₹${newTotal.toLocaleString('en-IN')}</span>`;
+    // Store updated total back for use in IntentMandate
+    if(tripData.expense_estimate) tripData.expense_estimate._selected_total=newTotal;
+  }else{
+    document.getElementById('cs').style.display='none';
+  }
 }
 
 async function sendIntent(){
@@ -738,15 +754,17 @@ async function sendIntent(){
   // Build cart items for IntentMandate
   const exp=tripData.expense_estimate||{};
   const ts=tripData.trip_summary||{};
+  const otherCosts=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
+  const selectedTotal=exp._selected_total||(sf.total_price_inr||0)+(sh.total_cost_inr||0)+otherCosts;
   const cart_items=[
     {label:`Flight: ${sf.airline} ${sf.flight_number||''}`,amount:{currency:'INR',value:sf.total_price_inr||0},pending:null},
     {label:`Hotel: ${sh.name||''} (${sh.total_nights||0} nights)`,amount:{currency:'INR',value:sh.total_cost_inr||0},pending:null},
-    {label:'Transport + Meals',amount:{currency:'INR',value:(exp.ground_transport_inr||0)+(exp.meals_inr||0)},pending:null}
+    {label:'Transport + Meals',amount:{currency:'INR',value:otherCosts},pending:null}
   ];
 
   try{
     const res=await fetch('/ap2-intent',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({trip_summary:ts,expense_estimate:exp,selected_flight:sf,selected_hotel:sh,cart_items})});
+      body:JSON.stringify({trip_summary:ts,expense_estimate:{...exp,total_inr:selectedTotal},selected_flight:sf,selected_hotel:sh,cart_items})});
     const data=await res.json();
     (data.steps||[]).forEach(s=>addStep(s,s.includes('ap2.')||s.includes('Mandate')?'m':'i'));
 
