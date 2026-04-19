@@ -1,5 +1,5 @@
 """
-Hiring Manager Client Agent — v2 
+Hiring Manager Client Agent — v2
 ==================================
 Full 3-step A2A hiring flow:
 1. Sourcing Agent  → find candidates
@@ -32,9 +32,11 @@ HTML_PAGE = """<!DOCTYPE html>
     .nav-badge{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:var(--violet);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
     .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:8px}
     .nav-links a:hover{color:var(--text);background:rgba(124,58,237,0.1)}
-    .container{max-width:960px;margin:0 auto;padding:28px 24px}
+    .container{max-width:900px;margin:0 auto;padding:28px 24px}
     h1{font-size:24px;font-weight:900;margin-bottom:4px}
     .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+    .sbar{padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:13px;font-weight:600}
+    .sbar.ok{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);color:var(--green)}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;margin-bottom:20px}
     .ct{font-size:12px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
     .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -49,31 +51,18 @@ HTML_PAGE = """<!DOCTYPE html>
     #result{display:none}
     .rc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:14px}
     .rct{font-size:12px;font-weight:700;color:var(--violet);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-    #steps{max-height:260px;overflow-y:auto}
+    #steps{max-height:280px;overflow-y:auto}
     .step{padding:5px 0;font-size:13px;border-bottom:1px solid var(--border);color:var(--green)}
     .step.e{color:var(--red)}
+    .cand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
+    .cand-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .cand-name{font-size:14px;font-weight:700;margin-bottom:4px}
+    .cand-score{display:inline-block;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}
+    .cand-detail{font-size:12px;color:var(--muted);margin-bottom:3px}
+    a.gh-link{color:var(--violet);text-decoration:none;font-size:12px;font-weight:600}
     .adv-btn{width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
     .bg-btn{width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;margin-top:12px}
     .next-info{margin-top:12px;padding:12px 14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:10px;font-size:13px;color:var(--muted)}
-    /* Candidate selection */
-    .cand-sel-list{margin-top:12px}
-    .cand-sel-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
-    .cand-sel-item:hover{border-color:#7c3aed}
-    .cand-sel-item.selected{border-color:#10b981;background:rgba(16,185,129,0.07)}
-    .cand-sel-item input[type=checkbox]{width:18px;height:18px;accent-color:#10b981;cursor:pointer;flex-shrink:0}
-    .cand-sel-info{flex:1}
-    .cand-sel-name{font-size:14px;font-weight:700;color:var(--text)}
-    .cand-sel-meta{font-size:12px;color:var(--muted);margin-top:2px}
-    .cand-sel-score{font-size:12px;font-weight:700;color:var(--green);margin-left:auto}
-    .sel-count{font-size:13px;color:var(--amber);font-weight:600;margin-top:8px}
-    /* Resume flows */
-    .flow-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .flow-info{flex:1}
-    .flow-title{font-size:14px;font-weight:700;color:var(--text)}
-    .flow-meta{font-size:12px;color:var(--muted);margin-top:3px}
-    .flow-status{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3)}
-    .resume-btn{background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
-    .resume-btn:hover{opacity:.88}
   </style>
 </head>
 <body>
@@ -91,19 +80,12 @@ HTML_PAGE = """<!DOCTYPE html>
 </nav>
 <div class="container">
   <h1>🚀 Hiring Manager</h1>
-  <p class="sub">A2A Client Agent — sequential hiring flow with candidate selection per round</p>
+  <p class="sub">A2A Client Agent — discovers agents from registry and runs the full sequential hiring flow</p>
 
-  <!-- Resume active flows -->
-  <div id="resumeSection" style="display:none">
-    <div class="card">
-      <div class="ct">📂 Resume Active Hiring Flows</div>
-      <div id="resumeList"></div>
-    </div>
-  </div>
+  <div id="regBar" class="sbar" style="display:none"></div>
 
-  <!-- New flow form -->
   <div class="card">
-    <div class="ct">🧑‍💼 Start New Hiring Flow</div>
+    <div class="ct">🧑‍💼 Job Requirements</div>
     <div class="g2">
       <div class="f"><label>Job Title</label><input id="jt" value="Senior Python Engineer"/></div>
       <div class="f"><label>Experience (Years)</label><input id="exp" type="number" value="5" min="0" max="20"/></div>
@@ -118,63 +100,47 @@ HTML_PAGE = """<!DOCTYPE html>
         </select>
       </div>
       <div class="f">
-        <label>No. of Candidates to Source</label>
+        <label>No. of Candidates</label>
         <select id="numcands">
-          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-          <option value="5" selected>5</option><option value="8">8</option><option value="10">10</option>
+          <option value="1">1 candidate</option><option value="2">2 candidates</option>
+          <option value="3">3 candidates</option><option value="5" selected>5 candidates</option>
+          <option value="8">8 candidates</option><option value="10">10 candidates</option>
         </select>
       </div>
-      <div class="f"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI"/></div>
+      <div class="f"><label>Additional Notes</label><input id="notes" placeholder="e.g. Must know FastAPI, Docker"/></div>
     </div>
     <button class="rbtn" id="btn" onclick="startHiring()">🚀 Start Hiring Flow (Source + Round 1)</button>
   </div>
 
   <div id="result">
     <div class="rc"><div class="rct">📊 A2A Flow Progress</div><div id="steps"></div></div>
-
-    <!-- Round 1 section with candidate checkboxes -->
+    <div id="candidatesSection" style="display:none">
+      <div class="rc"><div class="rct">👥 Candidates Found</div><div id="candidatesGrid" class="cand-grid"></div></div>
+    </div>
     <div id="round1Section" style="display:none">
       <div class="rc">
         <div class="rct">📅 Round 1 — HR Screening</div>
         <div id="round1Content"></div>
-        <div class="next-info" style="margin-top:14px">
-          ✅ Check which candidates <strong>cleared</strong> Round 1, then schedule Round 2 for them only:
-        </div>
-        <div class="cand-sel-list" id="round1CandList"></div>
-        <div class="sel-count" id="round1SelCount"></div>
-        <button class="adv-btn" onclick="advanceRound(2)">Schedule Round 2 (Technical) for Selected Candidates →</button>
+        <div class="next-info">⚡ Round 1 email sent. After the interview, click below:</div>
+        <button class="adv-btn" onclick="advanceRound(2)">✅ Round 1 Cleared → Schedule Round 2 (Technical)</button>
       </div>
     </div>
-
-    <!-- Round 2 section with candidate checkboxes -->
     <div id="round2Section" style="display:none">
       <div class="rc">
         <div class="rct">💻 Round 2 — Technical Interview</div>
         <div id="round2Content"></div>
-        <div class="next-info" style="margin-top:14px">
-          ✅ Check which candidates <strong>cleared</strong> Round 2, then schedule Round 3 for them only:
-        </div>
-        <div class="cand-sel-list" id="round2CandList"></div>
-        <div class="sel-count" id="round2SelCount"></div>
-        <button class="adv-btn" onclick="advanceRound(3)">Schedule Round 3 (Final Round) for Selected Candidates →</button>
+        <div class="next-info">⚡ Round 2 email sent. After the interview, click below:</div>
+        <button class="adv-btn" onclick="advanceRound(3)">✅ Round 2 Cleared → Schedule Round 3 (Final Round)</button>
       </div>
     </div>
-
-    <!-- Round 3 section with candidate checkboxes -->
     <div id="round3Section" style="display:none">
       <div class="rc">
         <div class="rct">🏁 Round 3 — Final Round</div>
         <div id="round3Content"></div>
-        <div class="next-info" style="margin-top:14px">
-          ✅ Check which candidates <strong>cleared</strong> the Final Round, then run background verification:
-        </div>
-        <div class="cand-sel-list" id="round3CandList"></div>
-        <div class="sel-count" id="round3SelCount"></div>
-        <button class="bg-btn" onclick="runBgCheck()">Run Background Verification for Selected Candidates →</button>
+        <div class="next-info">⚡ Round 3 email sent. After the interview, click below:</div>
+        <button class="bg-btn" onclick="runBgCheck()">✅ Round 3 Cleared → Run Background Verification</button>
       </div>
     </div>
-
-    <!-- Background check results -->
     <div id="bgSection" style="display:none">
       <div class="rc"><div class="rct">🔎 Background Verification</div><div id="bgContent"></div></div>
     </div>
@@ -183,87 +149,18 @@ HTML_PAGE = """<!DOCTYPE html>
 
 <script>
 var REGISTRY = '__REGISTRY__';
-var _flowData = {};          // current session flow
-var _currentRoundCands = {}; // candidates shown in each round's checkbox list
+var _flowData = {};
 
-// ── On load: check registry + load resume flows ─────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
-  loadActiveFlows();
-});
-
-function loadActiveFlows() {
-  fetch('/active-flows').then(function(r){ return r.json(); }).then(function(d){
-    var flows = d.flows || [];
-    if (flows.length === 0) return;
-    var sec = document.getElementById('resumeSection');
-    var list = document.getElementById('resumeList');
-    sec.style.display = 'block';
-    var statusLabel = {
-      'awaiting_round_1': 'Round 1 — Awaiting Candidate Selection',
-      'awaiting_round_2': 'Round 2 — Awaiting Candidate Selection',
-      'awaiting_round_3': 'Round 3 — Awaiting Candidate Selection',
-      'awaiting_bg_check':'All Rounds Done — Background Check Pending',
-      'in_progress':       'In Progress'
-    };
-    list.innerHTML = flows.map(function(f) {
-      return '<div class="flow-card">' +
-        '<div class="flow-info">' +
-          '<div class="flow-title">' + (f.title||'Untitled') + ' — ' + (f.location||'Remote') + '</div>' +
-          '<div class="flow-meta">Started: ' + (f.started_at||'') + ' &nbsp;|&nbsp; ' + (f.total_cands||0) + ' candidates sourced</div>' +
-        '</div>' +
-        '<span class="flow-status">' + (statusLabel[f.status] || f.status) + '</span>' +
-        '<button class="resume-btn" onclick="resumeFlow(\'' + f.flow_id + '\')">Resume →</button>' +
-      '</div>';
-    }).join('');
+  fetch('/registry-status').then(function(r){ return r.json(); }).then(function(d){
+    if (d.status === 'ok' && d.registered_agents > 0) {
+      var bar = document.getElementById('regBar');
+      bar.style.display = 'block';
+      bar.className = 'sbar ok';
+      bar.innerHTML = '✅ ' + d.registered_agents + ' agents registered. <a href="' + REGISTRY + '" target="_blank" style="color:var(--green);margin-left:8px">→ Registry</a>';
+    }
   }).catch(function(){});
-}
-
-async function resumeFlow(flowId) {
-  var r = await fetch('/flow-state/' + flowId);
-  var state = await r.json();
-  if (!state.found) { alert('Could not load flow state.'); return; }
-
-  // Restore _flowData
-  _flowData = {
-    flow_id:    state.flow_id,
-    request:    { job_title: state.title, location: state.location },
-    candidates: { candidates: state.candidates },
-    status:     state.status,
-    schedule:   {}
-  };
-
-  document.getElementById('result').style.display = 'block';
-  document.getElementById('steps').innerHTML = '';
-  addStep('📂 Resuming flow: ' + state.title + ' (' + state.started_at + ')');
-  addStep('👥 ' + state.candidates.length + ' candidates loaded from previous session');
-
-  var currentRound = state.current_round || 1;
-  var statusMap = { 'awaiting_round_2': 2, 'awaiting_round_3': 3, 'awaiting_bg_check': 4 };
-  var nextRound = statusMap[state.status] || 1;
-
-  // Show the appropriate round section with candidate selection
-  if (nextRound === 1) {
-    show('round1Section');
-    renderCandidateCheckboxes(state.candidates, 1, []);
-    addStep('⏳ Select which candidates cleared Round 1 and schedule Round 2.');
-  } else if (nextRound === 2) {
-    var cleared = state.cleared_candidates || [];
-    addStep('✅ Round 1 cleared by: ' + cleared.map(function(c){ return c.name||c.login; }).join(', '));
-    show('round2Section');
-    renderCandidateCheckboxes(cleared, 2, []);
-    addStep('⏳ Select which candidates cleared Round 2 and schedule Round 3.');
-  } else if (nextRound === 3) {
-    var cleared = state.cleared_candidates || [];
-    show('round3Section');
-    renderCandidateCheckboxes(cleared, 3, []);
-    addStep('⏳ Select which candidates cleared Round 3 and run background check.');
-  } else if (nextRound === 4) {
-    var cleared = state.cleared_candidates || [];
-    show('round3Section');
-    renderCandidateCheckboxes(cleared, 3, cleared);
-    addStep('⏳ All rounds complete. Run background verification for cleared candidates.');
-  }
-}
+});
 
 function addStep(msg) {
   var el = document.getElementById('steps');
@@ -274,75 +171,25 @@ function addStep(msg) {
   el.scrollTop = el.scrollHeight;
 }
 
-function show(id) { var e = document.getElementById(id); if(e) e.style.display='block'; }
-function hide(id) { var e = document.getElementById(id); if(e) e.style.display='none'; }
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
 
 function renderSchedule(sched, containerId) {
   var el = document.getElementById(containerId);
-  if (!sched || !sched.schedules) { el.innerHTML = ''; return; }
+  if (!sched || !sched.schedules) { el.innerHTML = '<pre style="font-size:11px;color:var(--muted)">' + JSON.stringify(sched,null,2) + '</pre>'; return; }
   el.innerHTML = sched.schedules.map(function(s) {
     var r = (s.interview_rounds || [])[0] || {};
-    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px">' +
-      '<strong>' + (s.candidate_name||'Candidate') + '</strong><br/>' +
-      '<span style="color:var(--muted);font-size:12px">📅 ' + (r.date||'TBD') + ' at ' + (r.time||'TBD') +
-      ' &nbsp;|&nbsp; 👤 ' + (r.interviewer||'') + '</span></div>';
+    return '<div style="padding:12px;border-bottom:1px solid var(--border);font-size:13px"><strong>' + (s.candidate_name||'Candidate') + '</strong><br/>' +
+      '<span style="color:var(--muted);font-size:12px">📅 ' + (r.date||'TBD') + ' at ' + (r.time||'TBD') + ' (' + (r.duration||'') + ')<br/>👤 ' + (r.interviewer||'') + '</span></div>';
   }).join('');
 }
 
-function renderCandidateCheckboxes(candidates, roundNum, preSelected) {
-  var listId = 'round' + roundNum + 'CandList';
-  var countId = 'round' + roundNum + 'SelCount';
-  _currentRoundCands[roundNum] = candidates;
-  var preIds = (preSelected || []).map(function(c){ return c.github_login || c.login || c.name; });
-  var html = candidates.map(function(c) {
-    var id = c.github_login || c.login || c.name || 'cand';
-    var checked = preIds.length === 0 || preIds.indexOf(id) >= 0;  // default all checked, or pre-selected
-    var score = c.match_score || c.score || '?';
-    var col = score >= 8 ? 'var(--green)' : score >= 6 ? 'var(--amber)' : 'var(--muted)';
-    return '<div class="cand-sel-item' + (checked ? ' selected' : '') + '" onclick="toggleCand(this)">' +
-      '<input type="checkbox" data-id="' + id + '" data-round="' + roundNum + '" ' + (checked?'checked':'') + ' onclick="event.stopPropagation();toggleCand(this.parentElement)"/>' +
-      '<div class="cand-sel-info">' +
-        '<div class="cand-sel-name">' + (c.name || c.login || id) + '</div>' +
-        '<div class="cand-sel-meta">📍 ' + (c.location||'Unknown') + (c.github_url ? ' &nbsp;·&nbsp; <a href="'+c.github_url+'" target="_blank" style="color:var(--violet)">GitHub</a>' : '') + '</div>' +
-      '</div>' +
-      '<span class="cand-sel-score" style="color:' + col + '">Score: ' + score + '/10</span>' +
-    '</div>';
-  }).join('');
-  document.getElementById(listId).innerHTML = html;
-  updateSelCount(roundNum);
-}
-
-function toggleCand(item) {
-  var cb = item.querySelector('input[type=checkbox]');
-  cb.checked = !cb.checked;
-  item.className = 'cand-sel-item' + (cb.checked ? ' selected' : '');
-  updateSelCount(parseInt(cb.dataset.round));
-}
-
-function updateSelCount(roundNum) {
-  var cbs = document.querySelectorAll('#round' + roundNum + 'CandList input[type=checkbox]');
-  var sel = Array.from(cbs).filter(function(cb){ return cb.checked; }).length;
-  var el = document.getElementById('round' + roundNum + 'SelCount');
-  el.textContent = sel + ' of ' + cbs.length + ' candidates selected for next round';
-}
-
-function getSelectedCandidates(roundNum) {
-  var cbs = document.querySelectorAll('#round' + roundNum + 'CandList input[type=checkbox]');
-  var allCands = _currentRoundCands[roundNum] || [];
-  var selIds = Array.from(cbs).filter(function(cb){ return cb.checked; }).map(function(cb){ return cb.dataset.id; });
-  return allCands.filter(function(c) {
-    var id = c.github_login || c.login || c.name || 'cand';
-    return selIds.indexOf(id) >= 0;
-  });
-}
-
-// ── Start new hiring flow ───────────────────────────────────────────────────
 function startHiring() {
   var btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = '⏳ Sourcing + Scheduling Round 1...';
+  btn.disabled = true; btn.textContent = '⏳ Running...';
   show('result');
   document.getElementById('steps').innerHTML = '';
-  ['round1Section','round2Section','round3Section','bgSection'].forEach(hide);
+  ['candidatesSection','round1Section','round2Section','round3Section','bgSection'].forEach(hide);
 
   fetch('/hire', {
     method: 'POST',
@@ -355,109 +202,98 @@ function startHiring() {
       notes:            document.getElementById('notes').value
     })
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r) { return r.json(); })
   .then(function(data) {
     _flowData = data;
     (data.steps || []).forEach(addStep);
 
-    var allCands = (data.candidates && data.candidates.candidates) ? data.candidates.candidates : [];
+    var cands = (data.candidates && data.candidates.candidates) ? data.candidates.candidates : [];
+    if (cands.length > 0) {
+      show('candidatesSection');
+      document.getElementById('candidatesGrid').innerHTML = cands.map(function(c) {
+        var score = c.match_score || c.score || '?';
+        var col = score >= 8 ? 'var(--green)' : score >= 6 ? 'var(--amber)' : 'var(--muted)';
+        return '<div class="cand-card"><div class="cand-name">' + (c.name||c.login||'Unknown') + '</div>' +
+          '<span class="cand-score" style="color:' + col + '">Score: ' + score + '/10</span>' +
+          '<div class="cand-detail">📍 ' + (c.location||'Unknown') + '</div>' +
+          (c.github_url ? '<a href="' + c.github_url + '" target="_blank" class="gh-link">→ GitHub</a>' : '') + '</div>';
+      }).join('');
+    }
 
-    // Show Round 1 section with candidate checkboxes — always
+    // Always show round1Section after sourcing — buttons must be visible
     show('round1Section');
-    renderSchedule(data.schedule, 'round1Content');
-    renderCandidateCheckboxes(allCands, 1, []);  // default all checked
+    if (data.schedule && data.schedule.schedules && data.schedule.schedules.length > 0) {
+      renderSchedule(data.schedule, 'round1Content');
+    } else {
+      document.getElementById('round1Content').innerHTML =
+        '<div style="padding:12px;color:var(--amber);font-size:13px">⚠️ Scheduler was unavailable (Render cold start). ' +
+        'The schedule will be sent via email shortly, or click Round 1 Cleared below to proceed manually.</div>';
+    }
     document.getElementById('round1Section').scrollIntoView({behavior:'smooth'});
-
-    loadActiveFlows();  // refresh resume list
   })
-  .catch(function(e){ addStep('❌ Error: ' + e.message); })
-  .finally(function(){ btn.disabled=false; btn.textContent='🚀 Start Hiring Flow (Source + Round 1)'; });
+  .catch(function(e) { addStep('❌ Error: ' + e.message); })
+  .finally(function() { btn.disabled = false; btn.textContent = '🚀 Start Hiring Flow (Source + Round 1)'; });
 }
 
-// ── Advance to next round with ONLY selected candidates ──────────────────────
-function advanceRound(toRound) {
-  var fromRound = toRound - 1;
-  var selected  = getSelectedCandidates(fromRound);
-  if (selected.length === 0) { alert('Please select at least one candidate who cleared Round ' + fromRound); return; }
-
+function advanceRound(roundNumber) {
+  var cands  = (_flowData.candidates && _flowData.candidates.candidates) ? _flowData.candidates.candidates : [];
   var role   = (_flowData.request && _flowData.request.job_title) ? _flowData.request.job_title : 'Software Engineer';
   var flowId = _flowData.flow_id || '';
   var btn    = event.target;
-  btn.disabled = true; btn.textContent = '⏳ Scheduling Round ' + toRound + ' for ' + selected.length + ' candidate(s)...';
-
-  addStep('✅ ' + selected.length + ' candidate(s) cleared Round ' + fromRound + ': ' +
-    selected.map(function(c){ return c.name||c.login||'?'; }).join(', '));
-  addStep('📤 Scheduling Round ' + toRound + '...');
-
-  // Save cleared candidates to persistent state
-  fetch('/save-flow-state', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ flow_id: flowId, cleared_candidates: selected, current_round: fromRound })
-  }).catch(function(){});
+  btn.disabled = true; btn.textContent = '⏳ Scheduling Round ' + roundNumber + '...';
+  addStep('⏳ Scheduling Round ' + roundNumber + '...');
 
   fetch('/schedule-round', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ round_number: toRound, candidates: selected, role: role, flow_id: flowId })
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({round_number: roundNumber, candidates: cands, role: role, flow_id: flowId})
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r) { return r.json(); })
   .then(function(data) {
     (data.steps || []).forEach(addStep);
     if (!data.success) { addStep('❌ ' + (data.error||'Failed')); btn.disabled=false; btn.textContent='Retry'; return; }
-
-    var sec = 'round' + toRound + 'Section';
+    var sec = 'round' + roundNumber + 'Section';
     show(sec);
-    renderSchedule(data.schedule, 'round' + toRound + 'Content');
-    renderCandidateCheckboxes(selected, toRound, []);  // show only cleared candidates
+    renderSchedule(data.schedule, 'round' + roundNumber + 'Content');
     document.getElementById(sec).scrollIntoView({behavior:'smooth'});
-
-    btn.textContent = '✅ Done — Round ' + toRound + ' scheduled';
+    btn.textContent = '✅ Round ' + (roundNumber-1) + ' Cleared';
     btn.style.background = '#374151'; btn.style.cursor = 'not-allowed';
   })
-  .catch(function(e){ addStep('❌ ' + e.message); btn.disabled=false; });
+  .catch(function(e) { addStep('❌ ' + e.message); btn.disabled=false; });
 }
 
-// ── Run background check on ONLY selected final-round candidates ─────────────
 function runBgCheck() {
-  var selected = getSelectedCandidates(3);
-  if (selected.length === 0) { alert('Please select at least one candidate who cleared Round 3'); return; }
-
+  var cands  = (_flowData.candidates && _flowData.candidates.candidates) ? _flowData.candidates.candidates : [];
   var role   = (_flowData.request && _flowData.request.job_title) ? _flowData.request.job_title : 'Software Engineer';
   var flowId = _flowData.flow_id || '';
   var btn    = event.target;
-  btn.disabled = true; btn.textContent = '⏳ Running background checks for ' + selected.length + ' candidate(s)...';
-
-  addStep('✅ ' + selected.length + ' candidate(s) cleared Round 3: ' +
-    selected.map(function(c){ return c.name||c.login||'?'; }).join(', '));
-  addStep('🔍 Running background verification...');
-
-  fetch('/save-flow-state', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ flow_id: flowId, cleared_candidates: selected, current_round: 3 })
-  }).catch(function(){});
+  btn.disabled = true; btn.textContent = '⏳ Running background checks...';
+  addStep('⏳ Running background verification...');
 
   fetch('/run-background-check', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ candidates: selected, role: role, flow_id: flowId })
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({candidates: cands, role: role, flow_id: flowId})
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r) { return r.json(); })
   .then(function(data) {
     (data.steps || []).forEach(addStep);
     if (!data.success) { addStep('❌ ' + (data.error||'Failed')); btn.disabled=false; return; }
     show('bgSection');
-    var checks = (data.background_checks && (data.background_checks.results || data.background_checks.verification_results)) || [];
+    var checks = (data.background_checks && data.background_checks.results) || (data.background_checks && data.background_checks.verification_results) || [];
     document.getElementById('bgContent').innerHTML = checks.length > 0
       ? checks.map(function(c) {
-          var pass = c.overall_status==='PASS' || c.status==='verified';
-          return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px">' +
+          var pass = c.overall_status === 'PASS' || c.status === 'verified';
+          return '<div style="padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px">' +
             '<strong>' + (c.candidate_name||c.name||'Candidate') + '</strong>' +
             '<span style="color:' + (pass?'var(--green)':'var(--amber)') + '">' + (c.overall_status||c.status||'Checked') + '</span></div>';
         }).join('')
       : '<pre style="font-size:11px;color:var(--muted);white-space:pre-wrap">' + JSON.stringify(data.background_checks,null,2) + '</pre>';
     document.getElementById('bgSection').scrollIntoView({behavior:'smooth'});
-    addStep('🎉 Pipeline complete! Source → R1 → R2 → R3 → Background Check done!');
-    btn.textContent='✅ Done'; btn.style.background='#374151'; btn.style.cursor='not-allowed';
+    addStep('🎉 Done! Source → Round 1 → Round 2 → Round 3 → Background Check complete!');
+    btn.textContent = '✅ Done'; btn.style.background = '#374151'; btn.style.cursor = 'not-allowed';
   })
-  .catch(function(e){ addStep('❌ ' + e.message); btn.disabled=false; });
+  .catch(function(e) { addStep('❌ ' + e.message); btn.disabled=false; });
 }
 </script>
 </body>
@@ -761,97 +597,6 @@ async def registry_status():
     except Exception:
         return {"status": "error", "registered_agents": 0}
 
-
-@app.get("/active-flows")
-async def get_active_flows():
-    """Return all in-progress hiring flows so HR can resume from any session."""
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            r = await client.get(f"{REGISTRY_URL}/registry/audit", params={"flow_type": "hiring", "limit": 20})
-            logs = r.json().get("logs", [])
-            active = []
-            for log in logs:
-                if log.get("status") in ("in_progress", "awaiting_round_1", "awaiting_round_2",
-                                          "awaiting_round_3", "rounds_complete"):
-                    # Parse stored flow state
-                    cands = []
-                    try:
-                        import json as _j
-                        rd = log.get("result_data")
-                        if isinstance(rd, str): rd = _j.loads(rd)
-                        if isinstance(rd, dict): cands = rd.get("candidates", [])
-                    except Exception: pass
-                    active.append({
-                        "flow_id":     log.get("flow_id"),
-                        "title":       log.get("title"),
-                        "subtitle":    log.get("subtitle"),
-                        "location":    log.get("location"),
-                        "status":      log.get("status"),
-                        "started_at":  log.get("started_at", "")[:10],
-                        "candidates":  cands,
-                        "total_cands": len(cands),
-                    })
-            return {"flows": active}
-    except Exception as e:
-        return {"flows": [], "error": str(e)}
-
-
-@app.post("/save-flow-state")
-async def save_flow_state(request: Request):
-    """Save which candidates cleared a round so HR can resume later."""
-    import json as _j
-    body            = await request.json()
-    flow_id         = body.get("flow_id")
-    cleared_cands   = body.get("cleared_candidates", [])
-    current_round   = body.get("current_round", 1)
-    status          = f"awaiting_round_{current_round + 1}" if current_round < 3 else "awaiting_bg_check"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
-                "flow_id":   flow_id,
-                "status":    status,
-                "extra_data": _j.dumps({"cleared_candidates": cleared_cands, "current_round": current_round})
-            })
-        return {"success": True, "status": status, "cleared": len(cleared_cands)}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-@app.get("/flow-state/{flow_id}")
-async def get_flow_state(flow_id: str):
-    """Get stored state for a specific flow — used when HR resumes after days."""
-    import json as _j
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            r = await client.get(f"{REGISTRY_URL}/registry/audit", params={"flow_type": "hiring", "limit": 50})
-            logs = r.json().get("logs", [])
-            log = next((l for l in logs if l.get("flow_id") == flow_id), None)
-            if not log:
-                return {"found": False}
-            # Parse stored data
-            cands, extra = [], {}
-            try:
-                rd = log.get("result_data")
-                if isinstance(rd, str): rd = _j.loads(rd)
-                if isinstance(rd, dict): cands = rd.get("candidates", [])
-            except Exception: pass
-            try:
-                ed = log.get("extra_data")
-                if isinstance(ed, str): extra = _j.loads(ed)
-            except Exception: pass
-            return {
-                "found":       True,
-                "flow_id":     flow_id,
-                "title":       log.get("title"),
-                "location":    log.get("location"),
-                "status":      log.get("status"),
-                "started_at":  log.get("started_at", "")[:10],
-                "candidates":  cands,
-                "cleared_candidates": extra.get("cleared_candidates", []),
-                "current_round":      extra.get("current_round", 1),
-            }
-    except Exception as e:
-        return {"found": False, "error": str(e)}
 
 
 @app.get("/", response_class=HTMLResponse)
