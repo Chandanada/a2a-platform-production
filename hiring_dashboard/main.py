@@ -1,5 +1,5 @@
 """
-Hiring Manager Client Agent — v2
+Hiring Manager Client Agent — v2 
 ==================================
 Full 3-step A2A hiring flow:
 1. Sourcing Agent  → find candidates
