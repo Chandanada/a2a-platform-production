@@ -141,12 +141,12 @@ def generate_offer_pdf(ol: dict, company: str) -> bytes:
 
 
 def send_offer_email(candidate_email: str, candidate_name: str, role: str,
-                     company: str, pdf_bytes: bytes, accept_url: str) -> bool:
+                     company: str, pdf_bytes: bytes, accept_url: str, reject_url: str = "") -> bool:
     """Send offer letter PDF to candidate with acceptance link."""
     if not GMAIL_SENDER or not GMAIL_APP_PASS:
         return False
     try:
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = f"Offer Letter — {role} at {company}"
         msg["From"]    = f"{company} HR <{GMAIL_SENDER}>"
         msg["To"]      = candidate_email
@@ -168,11 +168,17 @@ def send_offer_email(candidate_email: str, candidate_name: str, role: str,
     </p>
 
     <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin:20px 0;text-align:center">
-      <p style="color:#64748b;font-size:13px;margin:0 0 16px">Once you have reviewed your offer letter, please click below to formally accept:</p>
-      <a href="{accept_url}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px">
-        ✅ Accept Offer Letter
-      </a>
-      <p style="color:#94a3b8;font-size:11px;margin:12px 0 0">By clicking, you confirm your agreement to all terms in the attached PDF.</p>
+      <p style="color:#1e293b;font-size:14px;font-weight:600;margin:0 0 6px">Please review the attached PDF offer letter, then respond:</p>
+      <p style="color:#64748b;font-size:12px;margin:0 0 18px">You must respond within 7 days of receiving this offer.</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+        <a href="{accept_url}" style="display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px">
+          ✅ Accept Offer
+        </a>
+        <a href="{reject_url}" style="display:inline-block;background:#fff;color:#ef4444;border:2px solid #ef4444;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px">
+          ❌ Decline Offer
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:11px;margin:14px 0 0">By accepting, you confirm agreement to all terms in the attached PDF.</p>
     </div>
 
     <div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:16px">
@@ -240,6 +246,7 @@ async def send_offer_email_endpoint(request: Request):
 
     token      = make_accept_token(candidate_name, role, company)
     accept_url = f"{HR_DASHBOARD_URL}/accept-offer?token={token}&name={candidate_name.replace(' ','%20')}&role={role.replace(' ','%20')}&company={company.replace(' ','%20')}"
+    reject_url = f"{HR_DASHBOARD_URL}/reject-offer?token={token}&name={candidate_name.replace(' ','%20')}&role={role.replace(' ','%20')}&company={company.replace(' ','%20')}"
 
     try:
         pdf_bytes = generate_offer_pdf(ol, company)
@@ -248,7 +255,7 @@ async def send_offer_email_endpoint(request: Request):
         pdf_bytes = b""
 
     try:
-        sent = send_offer_email(candidate_email, candidate_name, role, company, pdf_bytes, accept_url)
+        sent = send_offer_email(candidate_email, candidate_name, role, company, pdf_bytes, accept_url, reject_url)
     except Exception as e:
         return JSONResponse({"success": False, "error": f"Email failed: {str(e)[:200]}", "accept_url": accept_url})
 
@@ -263,38 +270,154 @@ async def send_offer_email_endpoint(request: Request):
     return JSONResponse({"success": False, "error": f"Server error: {str(e)[:200]}"})
 
 
+def _offer_page_style():
+    return """<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0a0f1e,#1a0a3c);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:20px;padding:48px;max-width:580px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}.icon{font-size:64px;margin-bottom:20px}.title{font-size:28px;font-weight:800;color:#1e293b;margin-bottom:8px}.sub{color:#64748b;font-size:15px;line-height:1.7;margin-bottom:24px}.badge{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:30px;font-size:14px;font-weight:700;margin-bottom:24px}.info{background:#f8fafc;border-radius:12px;padding:20px;text-align:left;margin-bottom:16px}.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px}.info-row:last-child{border:none}.info-label{color:#64748b}.info-val{font-weight:600;color:#1e293b}textarea{width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:12px;font-size:14px;font-family:inherit;resize:vertical;min-height:100px;margin-bottom:16px}.reject-btn{width:100%;background:#ef4444;color:#fff;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}.ts{font-size:12px;color:#94a3b8;margin-top:12px}</style>"""
+
+
 @app.get("/accept-offer")
 async def accept_offer_page(token: str = "", name: str = "", role: str = "", company: str = ""):
-    """Candidate lands here after clicking Accept in email."""
     expected = make_accept_token(name, role, company)
     valid    = token == expected
     timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    if not valid:
+        return HTMLResponse("""<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px">
+<h1>❌ Invalid or Expired Link</h1><p>Please contact HR for assistance.</p></body></html>""")
 
-    if valid:
-        html = f"""<!DOCTYPE html><html>
-<head><meta charset="UTF-8"/><title>Offer Accepted — {company}</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0a0f1e,#1a0a3c);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}}.card{{background:#fff;border-radius:20px;padding:48px;max-width:560px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}}.icon{{font-size:64px;margin-bottom:20px}}.title{{font-size:28px;font-weight:800;color:#1e293b;margin-bottom:8px}}.sub{{color:#64748b;font-size:15px;line-height:1.7;margin-bottom:28px}}.badge{{display:inline-flex;align-items:center;gap:8px;background:#ecfdf5;border:1px solid #6ee7b7;color:#047857;padding:10px 24px;border-radius:30px;font-size:14px;font-weight:700;margin-bottom:28px}}.info{{background:#f8fafc;border-radius:12px;padding:20px;text-align:left;margin-bottom:20px}}.info-row{{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px}}.info-row:last-child{{border:none}}.info-label{{color:#64748b}}.info-val{{font-weight:600;color:#1e293b}}.ts{{font-size:12px;color:#94a3b8}}</style>
-</head><body>
+    # Notify HR of acceptance via email
+    try:
+        _notify_hr_decision(name, role, company, "ACCEPTED", "", timestamp)
+    except Exception:
+        pass
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Offer Accepted</title>{_offer_page_style()}</head><body>
 <div class="card">
   <div class="icon">🎉</div>
   <h1 class="title">Offer Accepted!</h1>
-  <p class="sub">Congratulations, <strong>{name}</strong>! Your acceptance has been recorded. The HR team will reach out shortly with next steps.</p>
-  <div class="badge">✅ E-Signature Confirmed</div>
+  <p class="sub">Congratulations, <strong>{name}</strong>! Your e-signature has been recorded. HR will contact you shortly with onboarding details.</p>
+  <div class="badge" style="background:#ecfdf5;border:1px solid #6ee7b7;color:#047857">✅ E-Signature Confirmed</div>
   <div class="info">
     <div class="info-row"><span class="info-label">Candidate</span><span class="info-val">{name}</span></div>
     <div class="info-row"><span class="info-label">Role</span><span class="info-val">{role}</span></div>
     <div class="info-row"><span class="info-label">Company</span><span class="info-val">{company}</span></div>
     <div class="info-row"><span class="info-label">Accepted On</span><span class="info-val">{timestamp}</span></div>
   </div>
-  <p class="ts">This acceptance is digitally recorded via A2A HR Platform. Reference: {token[:12].upper()}</p>
-</div>
-</body></html>"""
-    else:
-        html = """<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px">
-<h1>❌ Invalid or Expired Link</h1>
-<p>This acceptance link is invalid. Please contact HR for a new offer letter.</p></body></html>"""
-
+  <p class="ts">HR has been notified. Reference: {token[:12].upper()}</p>
+</div></body></html>"""
     return HTMLResponse(html)
+
+
+@app.get("/reject-offer")
+async def reject_offer_page(token: str = "", name: str = "", role: str = "", company: str = ""):
+    expected = make_accept_token(name, role, company)
+    valid    = token == expected
+    if not valid:
+        return HTMLResponse("""<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px">
+<h1>❌ Invalid Link</h1><p>Please contact HR for assistance.</p></body></html>""")
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Decline Offer</title>{_offer_page_style()}</head><body>
+<div class="card">
+  <div class="icon">😔</div>
+  <h1 class="title">Decline Offer</h1>
+  <p class="sub">We are sorry to see you go, <strong>{name}</strong>. Please let us know your reason so we can improve our process.</p>
+  <div class="info">
+    <div class="info-row"><span class="info-label">Role</span><span class="info-val">{role}</span></div>
+    <div class="info-row"><span class="info-label">Company</span><span class="info-val">{company}</span></div>
+  </div>
+  <textarea id="reason" placeholder="Please share your reason for declining (e.g. salary, location, competing offer, personal reasons...)"></textarea>
+  <button class="reject-btn" onclick="submitReject()">❌ Confirm Decline &amp; Notify HR</button>
+  <p class="ts" id="msg"></p>
+</div>
+<script>
+async function submitReject() {{
+  const reason = document.getElementById('reason').value.trim();
+  if (!reason) {{ document.getElementById('msg').textContent = 'Please enter a reason before submitting.'; return; }}
+  document.querySelector('.reject-btn').disabled = true;
+  document.querySelector('.reject-btn').textContent = '⏳ Submitting...';
+  const r = await fetch('/submit-rejection', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{token: '{token}', name: '{name}', role: '{role}', company: '{company}', reason}})
+  }});
+  const d = await r.json();
+  if (d.success) {{
+    document.querySelector('.card').innerHTML = '<div class="icon">📨</div><h1 class="title">Response Recorded</h1><p class="sub">Thank you for letting us know, <strong>{name}</strong>. Your response and reason have been sent to the HR team.</p><div class="badge" style="background:#fef2f2;border:1px solid #fca5a5;color:#dc2626">❌ Offer Declined</div>';
+  }} else {{
+    document.getElementById('msg').textContent = 'Submission failed. Please try again.';
+    document.querySelector('.reject-btn').disabled = false;
+    document.querySelector('.reject-btn').textContent = '❌ Confirm Decline & Notify HR';
+  }}
+}}
+</script></body></html>"""
+    return HTMLResponse(html)
+
+
+@app.post("/submit-rejection")
+async def submit_rejection(request: Request):
+    try:
+        body    = await request.json()
+        token   = body.get("token", "")
+        name    = body.get("name", "")
+        role    = body.get("role", "")
+        company = body.get("company", "")
+        reason  = body.get("reason", "No reason given")
+        expected = make_accept_token(name, role, company)
+        if token != expected:
+            return JSONResponse({"success": False, "error": "Invalid token"})
+        timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+        _notify_hr_decision(name, role, company, "DECLINED", reason, timestamp)
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+
+def _notify_hr_decision(name: str, role: str, company: str, decision: str, reason: str, timestamp: str):
+    """Send email to HR when candidate accepts or declines."""
+    if not GMAIL_SENDER or not GMAIL_APP_PASS:
+        return
+    is_accept = decision == "ACCEPTED"
+    color  = "#10b981" if is_accept else "#ef4444"
+    emoji  = "🎉" if is_accept else "😔"
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = f"{emoji} Offer {decision}: {name} — {role}"
+    msg["From"]    = f"A2A HR Platform <{GMAIL_SENDER}>"
+    msg["To"]      = GMAIL_SENDER
+    reason_html = f"""<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px;margin-top:16px">
+      <p style="font-weight:700;color:#dc2626;margin:0 0 8px">Reason for declining:</p>
+      <p style="color:#1e293b;font-size:14px;margin:0">{reason}</p>
+    </div>""" if not is_accept else ""
+    html = f"""<!DOCTYPE html><html><body style="font-family:'Segoe UI',sans-serif;background:#f8fafc;padding:20px">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <div style="background:{color};padding:24px 32px">
+    <h1 style="color:#fff;margin:0;font-size:18px">{emoji} Offer {decision.title()}: {name}</h1>
+    <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">{role} at {company}</p>
+  </div>
+  <div style="padding:24px 32px">
+    <table style="width:100%;font-size:14px;border-collapse:collapse">
+      <tr><td style="padding:8px 0;color:#64748b;width:120px">Candidate</td><td style="font-weight:600">{name}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b">Role</td><td style="font-weight:600">{role}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b">Company</td><td style="font-weight:600">{company}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b">Decision</td><td style="font-weight:700;color:{color}">{decision}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b">Timestamp</td><td>{timestamp}</td></tr>
+    </table>
+    {reason_html}
+  </div>
+  <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
+    <p style="color:#94a3b8;font-size:11px;margin:0">A2A HR Platform — Automated Notification</p>
+  </div>
+</div></body></html>"""
+    msg.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=25) as smtp:
+            smtp.ehlo(); smtp.starttls(); smtp.ehlo()
+            smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+            smtp.sendmail(GMAIL_SENDER, [GMAIL_SENDER], msg.as_string())
+    except Exception:
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=25) as smtp:
+                smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+                smtp.sendmail(GMAIL_SENDER, [GMAIL_SENDER], msg.as_string())
+        except Exception as e:
+            print(f"[HR notify] error: {e}")
 
 
 async def discover_agent(skill: str) -> dict | None:
