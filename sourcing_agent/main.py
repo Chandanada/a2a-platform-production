@@ -59,6 +59,10 @@ AGENT_CARD = {
 def get_agent_card():
     return JSONResponse(content=AGENT_CARD)
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "Candidate Sourcing Agent", "version": "3.0.0"}
+
 
 async def search_github_developers(language: str, min_followers: int = 5,
                                     count: int = 5, location: str = "",
@@ -122,11 +126,13 @@ async def search_github_developers(language: str, min_followers: int = 5,
                     timeout=10.0
                 )
                 repos = repos_resp.json()
+                if not isinstance(repos, list):
+                    repos = []
 
                 # Extract real languages from repos
                 languages = list(set(
                     r.get("language") for r in repos
-                    if r.get("language")
+                    if isinstance(r, dict) and r.get("language")
                 ))[:5]
 
                 profiles.append({
@@ -206,6 +212,7 @@ Return ONLY valid JSON (no markdown):
 
 @app.post("/")
 async def handle_message(request: Request):
+  try:
     body = await request.json()
     if body.get("method") != "SendMessage":
         return JSONResponse(content={
@@ -345,3 +352,11 @@ async def handle_message(request: Request):
             }
         }
     })
+
+  except Exception as e:
+    import traceback
+    print(f"[Sourcing Agent] Unhandled error: {e}\n{traceback.format_exc()}")
+    return JSONResponse(content={
+        "jsonrpc": "2.0", "id": "req-001",
+        "error": {"code": -32000, "message": f"Sourcing agent error: {str(e)[:200]}"}
+    }, status_code=200)

@@ -320,7 +320,7 @@ async def fetch_agent_card(agent_url: str) -> dict:
 
 
 async def send_message(agent_url: str, text: str, data: dict = None, timeout: float = 60.0) -> dict:
-    """Send official A2A SendMessage (JSON-RPC 2.0)"""
+    """Send official A2A SendMessage (JSON-RPC 2.0) — retries on 500"""
     parts = [{"text": text, "mediaType": "text/plain"}]
     if data:
         parts.append({"data": data, "mediaType": "application/json"})
@@ -336,12 +336,29 @@ async def send_message(agent_url: str, text: str, data: dict = None, timeout: fl
             }
         }
     }
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.post(agent_url, json=payload)
+    import asyncio
+    for attempt in range(3):
         try:
-            return r.json()
-        except Exception:
-            return {"error": f"Agent returned non-JSON (HTTP {r.status_code}): {r.text[:200]}"}
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                r = await client.post(agent_url, json=payload)
+                if r.status_code >= 500:
+                    if attempt < 2:
+                        await asyncio.sleep(10)
+                        continue
+                    return {"error": f"Agent returned HTTP {r.status_code} after retries: {r.text[:200]}"}
+                try:
+                    return r.json()
+                except Exception:
+                    if attempt < 2:
+                        await asyncio.sleep(5)
+                        continue
+                    return {"error": f"Agent returned non-JSON (HTTP {r.status_code}): {r.text[:200]}"}
+        except Exception as e:
+            if attempt < 2:
+                await asyncio.sleep(10)
+                continue
+            return {"error": str(e)}
+    return {"error": "All retries failed"}
 
 
 def extract_artifact(resp: dict) -> dict:
