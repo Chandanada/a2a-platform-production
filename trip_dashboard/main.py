@@ -193,7 +193,7 @@ async def ap2_intent(request: Request):
     agent = await discover_agent("process_payment")
     if not agent:
         report["status"] = "failed"
-        report["error"]  = "AP2 Payment Agent not registered. Register it at localhost:8000/register with skill: process_payment"
+        report["error"]  = "AP2 Payment Agent not registered. Go to your Registry and register it with skill: process_payment"
         return JSONResponse(report, status_code=404)
 
     url = agent["supportedInterfaces"][0]["url"]
