@@ -387,49 +387,55 @@ async def calendar(trip_id: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    return HTMLResponse(open("/tmp/trip_ui.html").read()
-                        if os.path.exists("/tmp/trip_ui.html")
-                        else _build_ui())
+    reg     = os.getenv("REGISTRY_URL", "https://a2a-platform-production-production.up.railway.app")
+    hiring  = os.getenv("HIRING_DASHBOARD_URL", "https://hiring-dashboard-cpcp.onrender.com")
+    hr      = os.getenv("HR_DASHBOARD_URL", "https://hr-dashboard-ttt2.onrender.com")
+    html = _build_ui()
+    html = html.replace("__REG__", reg).replace("__HIRING__", hiring).replace("__HR__", hr)
+    return HTMLResponse(html)
 
 
 def _build_ui() -> str:
     return """<!DOCTYPE html>
 <html>
 <head>
-  <title>Business Trip Planner — AP2 Protocol</title>
+  <title>Trip Planner — A2A Platform</title>
   <style>
     :root{--bg:#0a0f1e;--card:#111827;--card2:#1a2235;--border:#1e2d45;--amber:#f59e0b;--amber2:#fbbf24;--text:#e2e8f0;--muted:#64748b;--green:#10b981;--red:#f87171;--blue:#3b82f6;--violet:#7c3aed}
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:32px 20px}
-    .wrap{max-width:920px;margin:0 auto}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:28px 20px}
+    .wrap{max-width:940px;margin:0 auto}
     nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
     .brand{display:flex;align-items:center;gap:10px}
     .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#ef4444);display:flex;align-items:center;justify-content:center;font-size:18px}
     .brand-name{font-size:16px;font-weight:800}
-    .nav-links{display:flex;gap:8px;flex-wrap:wrap}
-    .nav-links a{color:var(--amber);font-size:12px;text-decoration:none;font-weight:600;padding:6px 10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px}
+    .nav-links a{color:var(--amber);font-size:12px;text-decoration:none;font-weight:600;padding:6px 10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;margin-left:6px}
     h1{font-size:22px;font-weight:900;margin-bottom:4px}
     .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
     .sbar{padding:11px 14px;border-radius:10px;margin-bottom:16px;font-size:12px;font-weight:600}
-    .sbar.checking{background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--amber)}
     .sbar.ok{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);color:var(--green)}
-    .sbar.error{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);color:var(--red)}
-    /* AP2 Protocol Banner */
-    .ap2-banner{background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(59,130,246,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px}
-    .ap2-title{font-weight:700;color:var(--violet);margin-bottom:4px}
-    .ap2-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:11px}
-    .ap2-node{background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.2);border-radius:20px;padding:3px 10px;font-weight:600;white-space:nowrap}
-    .ap2-arrow{color:var(--muted2)}
+    /* Trip type toggle */
+    .trip-toggle{display:flex;gap:10px;margin-bottom:18px}
+    .tt-btn{flex:1;padding:14px;border-radius:12px;border:2px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s}
+    .tt-btn:hover{border-color:var(--amber);color:var(--text)}
+    .tt-btn.active{border-color:var(--amber);background:rgba(245,158,11,0.08);color:var(--amber)}
+    .tt-icon{font-size:24px;display:block;margin-bottom:4px}
+    .tt-sub{font-size:11px;color:var(--muted);font-weight:400;margin-top:2px}
+    /* How it works banner */
+    .how-banner{background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);border-radius:12px;padding:14px 16px;margin-bottom:18px}
+    .how-title{font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+    .how-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+    .how-node{background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.2);border-radius:20px;padding:4px 12px;font-weight:600;white-space:nowrap}
+    .how-arr{color:var(--muted);font-size:14px}
     /* Stepper */
-    .stepper{display:flex;align-items:flex-start;margin-bottom:20px;overflow-x:auto;gap:0}
-    .sw{display:flex;flex-direction:column;align-items:center;min-width:60px}
-    .sd{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;border:2px solid var(--border);background:var(--card);color:var(--muted);transition:all .3s}
+    .stepper{display:flex;align-items:flex-start;margin-bottom:20px;overflow-x:auto}
+    .sw{display:flex;flex-direction:column;align-items:center;min-width:56px}
+    .sd{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;border:2px solid var(--border);background:var(--card);color:var(--muted);transition:all .3s}
     .sd.done{background:var(--green);border-color:var(--green);color:#fff}
     .sd.active{background:var(--amber);border-color:var(--amber);color:#000}
-    .sl{width:48px;height:2px;background:var(--border);flex-shrink:0;transition:background .3s;margin-top:14px}
+    .sl{width:44px;height:2px;background:var(--border);flex-shrink:0;transition:background .3s;margin-top:14px}
     .sl.done{background:var(--green)}
-    .sl-wrap{display:flex;align-items:flex-start}
-    .sl-label{font-size:9px;color:var(--muted);text-align:center;margin-top:4px;max-width:60px;line-height:1.3}
+    .sl-label{font-size:9px;color:var(--muted);text-align:center;margin-top:4px;max-width:56px;line-height:1.3}
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px}
     .ct{font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
     .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
@@ -439,7 +445,7 @@ def _build_ui() -> str:
     input,select{background:#080c1a;border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:12px;outline:none;width:100%;font-family:inherit}
     input:focus,select:focus{border-color:var(--amber)}
     select option{background:#111827}
-    .rbtn{width:100%;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s}
+    .rbtn{width:100%;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px}
     .rbtn:hover{opacity:.88}.rbtn:disabled{opacity:.4;cursor:not-allowed}
     #result{display:none}
     .rc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px}
@@ -452,41 +458,30 @@ def _build_ui() -> str:
     .oh{font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
     .oc{background:#080c1a;border:1px solid var(--border);border-radius:10px;padding:11px;cursor:pointer;transition:all .2s;margin-bottom:7px;position:relative}
     .oc:hover{border-color:var(--amber)}.oc.sel{border-color:var(--amber);background:rgba(245,158,11,0.06)}
-    .oc.sel::after{content:'✓';position:absolute;top:9px;right:11px;font-size:12px;font-weight:700;color:var(--amber)}
+    .oc.sel::after{content:'✓';position:absolute;top:9px;right:11px;font-size:13px;font-weight:900;color:var(--amber)}
     .ot{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
     .on{font-weight:700;font-size:12px}.op{color:var(--amber2);font-weight:700;font-size:13px}
     .od{font-size:11px;color:var(--muted)}
     .rc2{font-size:9px;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:2px 6px;font-weight:700;margin-left:4px}
     .er{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border)}
-    .er:last-child{border:none;font-weight:800;color:var(--amber2)}
-    .cs{background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px;margin-top:12px;display:none}
-    .cbtn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:11px 20px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;transition:opacity .2s}
+    .er:last-child{border:none;font-weight:800;color:var(--amber2);font-size:14px}
+    .cs{background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:16px;margin-top:14px;display:none}
+    .cbtn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px;width:100%;margin-top:8px}
     .cbtn:hover{opacity:.88}.cbtn:disabled{opacity:.4;cursor:not-allowed}
-    /* AP2 Payment section */
-    .ap2-pay{display:none}
-    .mandate-flow{background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);border-radius:10px;padding:14px;margin-bottom:14px}
-    .mf-title{font-size:11px;font-weight:700;color:#a78bfa;margin-bottom:10px}
-    .mf-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:11px}
-    .mf-step:last-child{margin-bottom:0}
-    .mf-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
-    .mf-dot.done{background:var(--green);color:#fff}
-    .mf-dot.active{background:var(--amber);color:#000}
-    .mf-dot.pending{background:var(--card2);color:var(--muted);border:1px solid var(--border)}
-    .mf-text .mf-label{font-weight:700;color:var(--text)}
-    .mf-text .mf-sub{color:var(--muted);margin-top:1px}
-    .cart-mandate-box{background:#080c1a;border:1px solid rgba(124,58,237,0.25);border-radius:10px;padding:14px;margin-bottom:12px}
-    .cmb-title{font-size:11px;font-weight:700;color:#a78bfa;margin-bottom:8px}
-    .cmb-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)}
-    .cmb-row:last-child{border:none}
-    .paybtn{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s}
+    .approval-info{background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:10px;font-size:12px;color:var(--blue);margin-bottom:8px}
+    .pay-sec{display:none}
+    .bill-box{background:#080c1a;border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;margin-bottom:14px}
+    .bill-title{font-size:13px;font-weight:700;color:var(--green);margin-bottom:12px}
+    .bill-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)}
+    .bill-row:last-child{border:none;font-weight:800;color:var(--amber2);font-size:15px}
+    .paybtn{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
     .paybtn:hover{opacity:.88}.paybtn:disabled{opacity:.4;cursor:not-allowed}
-    /* Success */
     .success-sec{display:none}
-    .bk-card{background:linear-gradient(135deg,#0a2318,#065f46);border:1px solid rgba(16,185,129,0.3);border-radius:14px;padding:22px;margin-bottom:12px;text-align:center}
-    .bk-icon{font-size:44px;margin-bottom:10px}
-    .bk-title{font-size:18px;font-weight:800;color:var(--green);margin-bottom:4px}
-    .bk-ref{font-size:13px;color:#a7f3d0;font-family:monospace;font-weight:700;margin-bottom:14px;letter-spacing:2px}
-    .chain-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--green);font-weight:600}
+    .bk-card{background:linear-gradient(135deg,#0a2318,#065f46);border:1px solid rgba(16,185,129,0.3);border-radius:14px;padding:28px;margin-bottom:12px;text-align:center}
+    .bk-icon{font-size:48px;margin-bottom:10px}
+    .bk-title{font-size:20px;font-weight:800;color:var(--green);margin-bottom:6px}
+    .bk-ref{font-size:14px;color:#a7f3d0;font-family:monospace;font-weight:700;margin-bottom:14px;letter-spacing:2px}
+    .bk-sub{font-size:13px;color:#a7f3d0;margin-bottom:16px}
     .ac{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
     .acard{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;text-decoration:none;color:var(--text);transition:all .2s;display:block}
     .acard:hover{border-color:var(--amber);transform:translateY(-2px)}
@@ -498,135 +493,123 @@ def _build_ui() -> str:
 <body>
 <div class="wrap">
   <nav>
-    <div class="brand"><div class="logo">✈️</div><span class="brand-name">Business Trip Planner</span></div>
+    <div class="brand"><div class="logo">✈️</div><span class="brand-name">Trip Planner</span></div>
     <div class="nav-links">
-      <a href="http://localhost:8000" target="_blank">Registry</a>
-      <a href="http://localhost:8003" target="_blank">Hiring</a>
-      <a href="http://localhost:8008" target="_blank">HR Ops</a>
+      <a href="__REG__" target="_blank">Registry</a>
+      <a href="__HIRING__" target="_blank">Hiring</a>
+      <a href="__HR__" target="_blank">HR Ops</a>
     </div>
   </nav>
 
-  <h1>Plan a Business Trip</h1>
-  <p class="sub">A2A Client Agent · Payment via <strong>AP2 (Agent Payments Protocol) v0.1</strong> · IntentMandate → CartMandate → PaymentMandate</p>
+  <h1>✈️ Plan Your Trip</h1>
+  <p class="sub">Your AI agent finds flights & hotels, prepares your bill, and confirms the booking after payment</p>
 
-  <!-- AP2 Protocol Banner -->
-  <div class="ap2-banner">
-    <div class="ap2-title">🔐 AP2 Protocol Flow</div>
-    <div class="ap2-flow">
-      <span class="ap2-node">Shopping Agent</span>
-      <span class="ap2-arrow">→ IntentMandate →</span>
-      <span class="ap2-node">Merchant Agent</span>
-      <span class="ap2-arrow">→ CartMandate →</span>
-      <span class="ap2-node">User Confirms</span>
-      <span class="ap2-arrow">→ PaymentMandate →</span>
-      <span class="ap2-node">Payment Processor</span>
-      <span class="ap2-arrow">→ Booking Confirmed</span>
-    </div>
+  <!-- Trip type selector -->
+  <div class="trip-toggle">
+    <button class="tt-btn active" id="ttCorp" onclick="setTripType('corporate')">
+      <span class="tt-icon">🏢</span>
+      <strong>Corporate Trip</strong>
+      <div class="tt-sub">Bill goes to your company for approval. Booking confirmed after company pays.</div>
+    </button>
+    <button class="tt-btn" id="ttPers" onclick="setTripType('personal')">
+      <span class="tt-icon">👨‍👩‍👧</span>
+      <strong>Personal / Family Trip</strong>
+      <div class="tt-sub">Bill comes directly to you. You confirm and pay. Instant booking.</div>
+    </button>
   </div>
 
-  <div id="regBar" class="sbar checking">⏳ Checking registry...</div>
+  <!-- How it works — plain English -->
+  <div class="how-banner" id="howBanner"></div>
+
+  <div id="regBar" class="sbar" style="display:none"></div>
 
   <!-- Progress stepper -->
-  <div class="stepper" id="stepper">
-    <div class="sl-wrap"><div class="sw"><div class="sd active" id="sd1">1</div><div class="sl-label">Plan</div></div></div>
+  <div class="stepper">
+    <div class="sl-wrap"><div class="sw"><div class="sd active" id="sd1">1</div><div class="sl-label" id="sl1l">Plan</div></div></div>
     <div class="sl" id="sl1"></div>
-    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd2">2</div><div class="sl-label">Select</div></div></div>
+    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd2">2</div><div class="sl-label">Pick Options</div></div></div>
     <div class="sl" id="sl2"></div>
-    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd3">3</div><div class="sl-label">Intent<br>Mandate</div></div></div>
+    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd3">3</div><div class="sl-label" id="sl3l">Send Bill</div></div></div>
     <div class="sl" id="sl3"></div>
-    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd4">4</div><div class="sl-label">Cart<br>Mandate</div></div></div>
+    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd4">4</div><div class="sl-label" id="sl4l">Review</div></div></div>
     <div class="sl" id="sl4"></div>
-    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd5">5</div><div class="sl-label">Payment<br>Mandate</div></div></div>
+    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd5">5</div><div class="sl-label">Confirm & Pay</div></div></div>
     <div class="sl" id="sl5"></div>
-    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd6">✓</div><div class="sl-label">Booked</div></div></div>
+    <div class="sl-wrap"><div class="sw"><div class="sd" id="sd6">✓</div><div class="sl-label">Booked! 🎉</div></div></div>
   </div>
 
   <!-- FORM -->
   <div class="card">
-    <div class="ct">✈️ Trip Details</div>
+    <div class="ct" id="formTitle">✈️ Trip Details</div>
     <div class="g2">
       <div class="f"><label>From City</label><input id="orig" value="Bangalore"/></div>
       <div class="f"><label>To City</label><input id="dest" value="Mumbai"/></div>
     </div>
     <div class="g3">
-      <div class="f"><label>Travel Date</label><input id="td" value="Monday, April 20, 2026"/></div>
-      <div class="f"><label>Return Date</label><input id="rd" value="Wednesday, April 22, 2026"/></div>
+      <div class="f"><label>Travel Date</label><input id="td" value="Monday, April 21, 2026"/></div>
+      <div class="f"><label>Return Date</label><input id="rd" value="Wednesday, April 23, 2026"/></div>
       <div class="f"><label>Travelers</label><input id="tv" type="number" value="1" min="1"/></div>
     </div>
     <div class="g2">
-      <div class="f"><label>Purpose</label><input id="pur" value="Client meeting and product demo"/></div>
+      <div class="f"><label>Purpose / Occasion</label><input id="pur" value="Client meeting"/></div>
       <div class="f"><label>Budget (₹)</label><input id="bud" type="number" value="50000"/></div>
+    </div>
+    <!-- Corporate only: approver email -->
+    <div id="approverRow" class="f" style="margin-top:10px">
+      <label>Manager / Approver Email</label>
+      <input id="approverEmail" placeholder="manager@company.com" value="chandannov2291@gmail.com"/>
+      <span style="font-size:11px;color:var(--muted);margin-top:3px">The bill will be emailed here for approval before booking is confirmed.</span>
     </div>
     <button class="rbtn" id="planBtn" onclick="plan()">✈️ Find Flights & Hotels</button>
   </div>
 
   <div id="result">
-    <div class="rc"><div class="rct">📊 A2A + AP2 Flow Log</div><div id="steps"></div></div>
+    <div class="rc"><div class="rct">📋 What your agent is doing</div><div id="steps" style="max-height:220px;overflow-y:auto"></div></div>
 
-    <!-- Options -->
+    <!-- Flight & Hotel selection -->
     <div class="rc" id="optCard" style="display:none">
-      <div class="rct">🗺️ Select Preferences</div>
+      <div class="rct">🗺️ Choose Your Flight & Hotel</div>
       <div class="tbar" id="tbar"></div>
       <div class="og">
         <div><div class="oh">✈️ Flights</div><div id="flts"></div></div>
         <div><div class="oh">🏨 Hotels</div><div id="htls"></div></div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">💰 Expense</div>
+      <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px">💰 Your Estimated Cost</div>
       <div id="expb"></div>
+
+      <!-- Confirm & send bill section -->
       <div class="cs" id="cs">
-        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">✅ Send AP2 IntentMandate</div>
-        <div id="csum" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
-        <button class="cbtn" id="confirmBtn" onclick="sendIntent()">🔐 Send IntentMandate to Payment Agent</button>
-        <span style="font-size:11px;color:var(--muted)">Agent will return a CartMandate</span>
+        <div id="csTitle" style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px"></div>
+        <div id="csum" style="font-size:12px;color:var(--muted);margin-bottom:12px"></div>
+        <div id="approvalInfoBox"></div>
+        <button class="cbtn" id="confirmBtn" onclick="sendIntent()"></button>
       </div>
     </div>
 
-    <!-- AP2 Payment -->
-    <div class="ap2-pay" id="paySection">
+    <!-- Bill review + payment section -->
+    <div class="pay-sec" id="paySection">
       <div class="rc">
-        <div class="rct">🔐 AP2 Payment Flow</div>
+        <div class="rct" id="payTitle">💳 Your Bill — Review & Confirm</div>
 
-        <!-- Mandate flow tracker -->
-        <div class="mandate-flow">
-          <div class="mf-title">AP2 Mandate Chain Progress</div>
-          <div class="mf-step">
-            <div class="mf-dot done" id="mf1">✓</div>
-            <div class="mf-text"><div class="mf-label">IntentMandate sent</div><div class="mf-sub">Shopping Agent → Merchant Agent</div></div>
-          </div>
-          <div class="mf-step">
-            <div class="mf-dot done" id="mf2">✓</div>
-            <div class="mf-text"><div class="mf-label">CartMandate received</div><div class="mf-sub">Merchant Agent → Shopping Agent (signed)</div></div>
-          </div>
-          <div class="mf-step">
-            <div class="mf-dot active" id="mf3">3</div>
-            <div class="mf-text"><div class="mf-label">User confirms cart ← YOU ARE HERE</div><div class="mf-sub">Human-present: review and confirm</div></div>
-          </div>
-          <div class="mf-step">
-            <div class="mf-dot pending" id="mf4">4</div>
-            <div class="mf-text"><div class="mf-label">PaymentMandate sent</div><div class="mf-sub">Shopping Agent → Payment Processor (signed)</div></div>
-          </div>
-        </div>
-
-        <!-- Cart Mandate display -->
-        <div class="cart-mandate-box" id="cartMandateBox">
-          <div class="cmb-title">📋 CartMandate (from Merchant Agent)</div>
+        <div class="bill-box" id="billBox">
+          <div class="bill-title" id="billTitle">📋 Here's your itemised bill:</div>
           <div id="cartItems"></div>
-          <div class="cmb-row" style="font-weight:800;color:var(--amber2)"><span>Total</span><span id="cartTotal"></span></div>
-          <div style="font-size:10px;color:var(--muted);margin-top:8px">
-            merchant_signature: <span id="sigDisplay" style="font-family:monospace;color:#a78bfa"></span>
-          </div>
+          <div class="bill-row" style="font-weight:800;color:var(--amber2);font-size:15px"><span>Total to Pay</span><span id="cartTotal"></span></div>
         </div>
 
-        <!-- Card input for PaymentMandate -->
-        <div class="g2">
-          <div class="f"><label>Card Last 4 Digits</label><input id="cardLast4" maxlength="4" placeholder="4567" style="font-size:18px;font-family:monospace;letter-spacing:4px"/></div>
-          <div class="f"><label>Spend Limit (₹)</label><input id="spendLimit" type="number" value="50000"/></div>
+        <div id="corporateApprovalMsg" style="display:none;padding:14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:10px;font-size:13px;color:var(--blue);margin-bottom:12px"></div>
+
+        <!-- Card input — personal only -->
+        <div id="cardSection">
+          <div class="g2">
+            <div class="f"><label>Card Last 4 Digits</label><input id="cardLast4" maxlength="4" placeholder="4567" style="font-size:18px;font-family:monospace;letter-spacing:4px"/></div>
+            <div class="f"><label>Spend Limit (₹)</label><input id="spendLimit" type="number" value="50000"/></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;padding:8px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:8px">
+            🔐 Your payment is secured using the AP2 (Agent Payments Protocol). Your card details are never shared with the travel agent — only a signed payment authorization is sent.
+          </div>
+          <button class="paybtn" id="payBtn" onclick="sendPayment()">✅ Confirm & Pay — Complete Booking</button>
         </div>
-        <div style="background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:10px;margin-top:8px;font-size:11px;color:#a78bfa">
-          🔐 <strong>AP2 user_authorization</strong> will be generated as HMAC-SHA256 over CartMandate contents.
-          Production: hardware-backed ECDSA per W3C Verifiable Credentials.
-        </div>
-        <button class="paybtn" id="payBtn" onclick="sendPayment()">🔐 Sign & Send PaymentMandate</button>
       </div>
     </div>
 
@@ -636,10 +619,13 @@ def _build_ui() -> str:
         <div class="bk-icon">🎉</div>
         <div class="bk-title">Booking Confirmed!</div>
         <div class="bk-ref" id="bkRef">BKG--------</div>
-        <div class="chain-badge">✅ IntentMandate → CartMandate → PaymentMandate · AP2 v0.1</div>
+        <div class="bk-sub" id="bkSub">A confirmation email has been sent.</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--green);font-weight:600">
+          ✅ Paid & Confirmed via AP2 Agent Payments Protocol
+        </div>
       </div>
       <div class="rc">
-        <div class="rct">🎯 Next Steps</div>
+        <div class="rct">🎯 What's Next</div>
         <div id="nextSteps"></div>
         <div class="ac" id="actionCards"></div>
       </div>
@@ -648,175 +634,247 @@ def _build_ui() -> str:
 </div>
 
 <script>
-let tripData=null, sf=null, sh=null, apData=null, confirmedId=null;
+let tripData=null, sf=null, sh=null, apData=null, tripType='corporate';
+const REG='__REG__';
+
+function setTripType(type){
+  tripType=type;
+  document.getElementById('ttCorp').className='tt-btn'+(type==='corporate'?' active':'');
+  document.getElementById('ttPers').className='tt-btn'+(type==='personal'?' active':'');
+  document.getElementById('approverRow').style.display=type==='corporate'?'flex':'none';
+  updateHowBanner();
+}
+
+function updateHowBanner(){
+  const el=document.getElementById('howBanner');
+  if(tripType==='corporate'){
+    el.innerHTML='<div class="how-title">🏢 How Corporate Trip Payment Works</div>'+
+      '<div class="how-flow">'+
+      '<span class="how-node">You select flights & hotel</span><span class="how-arr">→</span>'+
+      '<span class="how-node">AI sends bill to your manager</span><span class="how-arr">→</span>'+
+      '<span class="how-node">Manager approves & pays</span><span class="how-arr">→</span>'+
+      '<span class="how-node">Booking confirmed + email</span>'+
+      '</div>';
+  } else {
+    el.innerHTML='<div class="how-title">👨‍👩‍👧 How Personal Trip Payment Works</div>'+
+      '<div class="how-flow">'+
+      '<span class="how-node">You select flights & hotel</span><span class="how-arr">→</span>'+
+      '<span class="how-node">AI shows you the bill</span><span class="how-arr">→</span>'+
+      '<span class="how-node">You confirm & pay</span><span class="how-arr">→</span>'+
+      '<span class="how-node">Booking confirmed + email</span>'+
+      '</div>';
+  }
+}
 
 function setStep(n){
   for(let i=1;i<=6;i++){
-    const dot=document.getElementById(`sd${i}`);
-    const line=document.getElementById(`sl${i}`);
+    const dot=document.getElementById('sd'+i);
+    const line=document.getElementById('sl'+i);
     if(i<n){dot.className='sd done';if(line)line.className='sl done';}
     else if(i===n){dot.className='sd active';}
     else{dot.className='sd';if(line)line.className='sl';}
   }
 }
 
-async function checkReg(){
-  const b=document.getElementById('regBar');
-  try{
-    const r=await fetch('/registry-status'); const d=await r.json();
+window.addEventListener('DOMContentLoaded',function(){
+  setTripType('corporate');
+  setStep(1);
+  fetch('/registry-status').then(function(r){return r.json();}).then(function(d){
     if(d.status==='ok'&&d.registered_agents>0){
-      b.className='sbar ok';
-      b.innerHTML=`✅ <strong>${d.registered_agents} agents registered.</strong>
-        <a href="http://localhost:8000" target="_blank" style="color:var(--amber2);margin-left:8px;font-weight:600">→ Registry</a>`;
-    }else{
-      b.className='sbar error';
-      b.innerHTML=`❌ No agents. <a href="http://localhost:8000/register" target="_blank" style="color:var(--amber2);margin-left:8px">→ Register Travel Agent + AP2 Payment Agent</a>`;
+      var b=document.getElementById('regBar');
+      b.style.display='block'; b.className='sbar ok';
+      b.innerHTML='✅ '+d.registered_agents+' agents ready. <a href="'+REG+'" target="_blank" style="color:var(--amber2);margin-left:6px;font-weight:600">→ Registry</a>';
     }
-  }catch(e){b.className='sbar error';b.innerHTML='❌ Registry not reachable.';}
-}
-window.addEventListener('DOMContentLoaded',()=>{checkReg();setStep(1);});
+  }).catch(function(){});
+});
 
-function addStep(text, cls=''){
-  const el=document.getElementById('steps');
-  const d=document.createElement('div');
-  d.className='step '+(text.includes('❌')?' e':cls);
-  d.textContent=text; el.appendChild(d);
-  el.scrollTop=el.scrollHeight;
+function addStep(text,cls){
+  var el=document.getElementById('steps');
+  var d=document.createElement('div');
+  d.className='step '+(text.indexOf('❌')>=0?'e':(cls||''));
+  d.textContent=text; el.appendChild(d); el.scrollTop=el.scrollHeight;
 }
 
 async function plan(){
-  const btn=document.getElementById('planBtn');
-  btn.disabled=true; btn.textContent='⏳ Finding options...';
+  var btn=document.getElementById('planBtn');
+  btn.disabled=true; btn.textContent='⏳ Searching for best options...';
   document.getElementById('result').style.display='block';
   document.getElementById('steps').innerHTML='';
   document.getElementById('optCard').style.display='none';
   document.getElementById('paySection').style.display='none';
   sf=null; sh=null; setStep(1);
   try{
-    const res=await fetch('/plan-trip',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({origin:document.getElementById('orig').value,destination:document.getElementById('dest').value,
-        travel_date:document.getElementById('td').value,return_date:document.getElementById('rd').value,
-        travelers:parseInt(document.getElementById('tv').value),purpose:document.getElementById('pur').value,
+    var res=await fetch('/plan-trip',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({origin:document.getElementById('orig').value,
+        destination:document.getElementById('dest').value,
+        travel_date:document.getElementById('td').value,
+        return_date:document.getElementById('rd').value,
+        travelers:parseInt(document.getElementById('tv').value),
+        purpose:document.getElementById('pur').value,
         budget_inr:document.getElementById('bud').value})});
-    const data=await res.json();
-    (data.steps||[]).forEach(s=>addStep(s));
-    if(data.error){addStep(`❌ ${data.error}`);}
+    var data=await res.json();
+    (data.steps||[]).forEach(function(s){addStep(s);});
+    if(data.error){addStep('❌ '+data.error);}
     else if(data.trip_plan&&Object.keys(data.trip_plan).length>0){
       tripData=data.trip_plan; renderOpts(tripData);
       document.getElementById('optCard').style.display='block'; setStep(2);
     }
-  }catch(e){addStep(`Error: ${e.message}`);}
+  }catch(e){addStep('❌ Error: '+e.message);}
   btn.disabled=false; btn.textContent='✈️ Find Flights & Hotels';
 }
 
 function renderOpts(p){
-  const ts=p.trip_summary||{}; const exp=p.expense_estimate||{};
-  document.getElementById('tbar').innerHTML=`<div><div class="l">Route</div><div class="v">${ts.origin||''}→${ts.destination||''}</div></div><div><div class="l">Dates</div><div class="v">${ts.travel_date||''}–${ts.return_date||''}</div></div><div><div class="l">Total</div><div class="v c">₹${(ts.estimated_total_cost_inr||0).toLocaleString('en-IN')}</div></div>`;
-  const fc=document.getElementById('flts'); fc.innerHTML='';
-  (p.flights||[]).forEach((f,i)=>{const rec=(p.recommended_option?.flight||'').includes(f.airline);const d=document.createElement('div');d.className='oc'+(rec?' sel':'');d.onclick=()=>selF(i,d);d.innerHTML=`<div class="ot"><div><div class="on">${f.airline} ${f.flight_number||''}${rec?'<span class="rc2">Rec</span>':''}</div><div class="od">${f.departure||''}→${f.arrival||''}·${f.duration||''}</div><div class="od">₹${(f.total_price_inr||0).toLocaleString('en-IN')}</div></div><div class="op">₹${(f.price_per_person_inr||0).toLocaleString('en-IN')}/pp</div></div>`;fc.appendChild(d);if(rec&&!sf){sf=p.flights[i];chk();}});
-  const hc=document.getElementById('htls'); hc.innerHTML='';
-  (p.hotels||[]).forEach((h,i)=>{const rec=(p.recommended_option?.hotel||'').includes((h.name||'').split(' ')[0]);const d=document.createElement('div');d.className='oc'+(rec?' sel':'');d.onclick=()=>selH(i,d);d.innerHTML=`<div class="ot"><div><div class="on">${h.name||''} ${'⭐'.repeat(h.rating||0)}</div><div class="od">${h.location||''}</div><div class="od">${h.total_nights||0}n · ₹${(h.total_cost_inr||0).toLocaleString('en-IN')}</div></div><div class="op">₹${(h.price_per_night_inr||0).toLocaleString('en-IN')}/n</div></div>`;hc.appendChild(d);if(rec&&!sh){sh=p.hotels[i];chk();}});
-  const exp2=p.expense_estimate||{};
-  document.getElementById('expb').innerHTML=`<div class="er"><span>Flights</span><span>₹${(exp2.flights_inr||0).toLocaleString('en-IN')}</span></div><div class="er"><span>Hotel</span><span>₹${(exp2.hotel_inr||0).toLocaleString('en-IN')}</span></div><div class="er"><span>Transport+Meals</span><span>₹${((exp2.ground_transport_inr||0)+(exp2.meals_inr||0)).toLocaleString('en-IN')}</span></div><div class="er"><span>TOTAL</span><span>₹${(exp2.total_inr||0).toLocaleString('en-IN')}</span></div>`;
+  var ts=p.trip_summary||{}; var exp=p.expense_estimate||{};
+  document.getElementById('tbar').innerHTML=
+    '<div><div class="l">Route</div><div class="v">'+ts.origin+'→'+ts.destination+'</div></div>'+
+    '<div><div class="l">Dates</div><div class="v">'+ts.travel_date+'–'+ts.return_date+'</div></div>'+
+    '<div><div class="l">Est. Total</div><div class="v c">₹'+(ts.estimated_total_cost_inr||0).toLocaleString('en-IN')+'</div></div>';
+  var fc=document.getElementById('flts'); fc.innerHTML='';
+  (p.flights||[]).forEach(function(f,i){
+    var rec=(p.recommended_option?.flight||'').includes(f.airline);
+    var d=document.createElement('div'); d.className='oc'+(rec?' sel':'');
+    d.onclick=function(){selF(i,d);};
+    d.innerHTML='<div class="ot"><div><div class="on">'+f.airline+' '+( f.flight_number||'')+(rec?'<span class="rc2">Best</span>':'')+'</div>'+
+      '<div class="od">'+f.departure+'→'+f.arrival+' · '+f.duration+'</div>'+
+      '<div class="od">₹'+(f.total_price_inr||0).toLocaleString('en-IN')+'</div></div>'+
+      '<div class="op">₹'+(f.price_per_person_inr||0).toLocaleString('en-IN')+'/pp</div></div>';
+    fc.appendChild(d); if(rec&&!sf){sf=p.flights[i];chk();}
+  });
+  var hc=document.getElementById('htls'); hc.innerHTML='';
+  (p.hotels||[]).forEach(function(h,i){
+    var rec=(p.recommended_option?.hotel||'').includes((h.name||'').split(' ')[0]);
+    var d=document.createElement('div'); d.className='oc'+(rec?' sel':'');
+    d.onclick=function(){selH(i,d);};
+    d.innerHTML='<div class="ot"><div><div class="on">'+h.name+' '+'⭐'.repeat(h.rating||0)+(rec?'<span class="rc2">Best</span>':'')+'</div>'+
+      '<div class="od">'+h.location+'</div>'+
+      '<div class="od">'+(h.total_nights||0)+'n · ₹'+(h.total_cost_inr||0).toLocaleString('en-IN')+'</div></div>'+
+      '<div class="op">₹'+(h.price_per_night_inr||0).toLocaleString('en-IN')+'/n</div></div>';
+    hc.appendChild(d); if(rec&&!sh){sh=p.hotels[i];chk();}
+  });
 }
 
-function selF(i,el){document.querySelectorAll('#flts .oc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');sf=tripData.flights[i];chk();}
-function selH(i,el){document.querySelectorAll('#htls .oc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');sh=tripData.hotels[i];chk();}
+function selF(i,el){document.querySelectorAll('#flts .oc').forEach(function(c){c.classList.remove('sel');});el.classList.add('sel');sf=tripData.flights[i];chk();}
+function selH(i,el){document.querySelectorAll('#htls .oc').forEach(function(c){c.classList.remove('sel');});el.classList.add('sel');sh=tripData.hotels[i];chk();}
+
 function chk(){
   if(sf&&sh){
-    // Recalculate from actual selection — not fixed API estimate
-    const exp=tripData.expense_estimate||{};
-    const otherCosts=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
-    const flightCost=sf.total_price_inr||0;
-    const hotelCost=sh.total_cost_inr||0;
-    const newTotal=flightCost+hotelCost+otherCosts;
-    // Update expense block with real numbers
+    var exp=tripData.expense_estimate||{};
+    var other=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
+    var fc=sf.total_price_inr||0, hc=sh.total_cost_inr||0;
+    var total=fc+hc+other;
+    if(tripData.expense_estimate) tripData.expense_estimate._selected_total=total;
     document.getElementById('expb').innerHTML=
-      `<div class="er"><span>Flights</span><span>₹${flightCost.toLocaleString('en-IN')}</span></div>`+
-      `<div class="er"><span>Hotel</span><span>₹${hotelCost.toLocaleString('en-IN')}</span></div>`+
-      `<div class="er"><span>Transport+Meals</span><span>₹${otherCosts.toLocaleString('en-IN')}</span></div>`+
-      `<div class="er" style="font-weight:800;color:var(--amber2);font-size:14px"><span>TOTAL</span><span>₹${newTotal.toLocaleString('en-IN')}</span></div>`;
-    // Show confirm section
-    document.getElementById('cs').style.display='block';
-    document.getElementById('csum').innerHTML=`<strong>${sf.airline} ${sf.flight_number||''}</strong> + <strong>${sh.name||''}</strong><br><span style="color:var(--amber2);font-weight:700">Total: ₹${newTotal.toLocaleString('en-IN')}</span>`;
-    // Store updated total back for use in IntentMandate
-    if(tripData.expense_estimate) tripData.expense_estimate._selected_total=newTotal;
+      '<div class="er"><span>Flight ('+sf.airline+')</span><span>₹'+fc.toLocaleString('en-IN')+'</span></div>'+
+      '<div class="er"><span>Hotel ('+sh.name+')</span><span>₹'+hc.toLocaleString('en-IN')+'</span></div>'+
+      '<div class="er"><span>Transport & Meals</span><span>₹'+other.toLocaleString('en-IN')+'</span></div>'+
+      '<div class="er"><span>TOTAL</span><span>₹'+total.toLocaleString('en-IN')+'</span></div>';
+    var cs=document.getElementById('cs'); cs.style.display='block';
+    document.getElementById('csTitle').textContent=
+      tripType==='corporate' ? '📤 Ready to send for company approval' : '📋 Ready to review your bill';
+    document.getElementById('csum').innerHTML=
+      '<strong>'+sf.airline+' '+sf.flight_number+'</strong> + <strong>'+sh.name+'</strong><br>'+
+      '<span style="color:var(--amber2);font-weight:700">Total: ₹'+total.toLocaleString('en-IN')+'</span>';
+    var aib=document.getElementById('approvalInfoBox');
+    if(tripType==='corporate'){
+      var approver=document.getElementById('approverEmail').value||'your manager';
+      aib.innerHTML='<div class="approval-info">📧 Bill will be emailed to <strong>'+approver+'</strong> for approval. Once they confirm, your booking is automatically placed.</div>';
+    } else {
+      aib.innerHTML='';
+    }
+    var cbtn=document.getElementById('confirmBtn');
+    cbtn.textContent=tripType==='corporate' ? '📤 Send Bill to Manager for Approval' : '📋 View My Bill & Pay';
   }else{
     document.getElementById('cs').style.display='none';
   }
 }
 
 async function sendIntent(){
-  const btn=document.getElementById('confirmBtn');
-  btn.disabled=true; btn.textContent='⏳ Sending IntentMandate...';
+  var btn=document.getElementById('confirmBtn');
+  btn.disabled=true;
+  btn.textContent=tripType==='corporate'?'⏳ Sending to manager...':'⏳ Preparing your bill...';
   setStep(3);
-
-  // Build cart items for IntentMandate
-  const exp=tripData.expense_estimate||{};
-  const ts=tripData.trip_summary||{};
-  const otherCosts=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
-  const selectedTotal=exp._selected_total||(sf.total_price_inr||0)+(sh.total_cost_inr||0)+otherCosts;
-  const cart_items=[
-    {label:`Flight: ${sf.airline} ${sf.flight_number||''}`,amount:{currency:'INR',value:sf.total_price_inr||0},pending:null},
-    {label:`Hotel: ${sh.name||''} (${sh.total_nights||0} nights)`,amount:{currency:'INR',value:sh.total_cost_inr||0},pending:null},
-    {label:'Transport + Meals',amount:{currency:'INR',value:otherCosts},pending:null}
+  var exp=tripData.expense_estimate||{};
+  var ts=tripData.trip_summary||{};
+  var other=(exp.ground_transport_inr||0)+(exp.meals_inr||0);
+  var selectedTotal=exp._selected_total||(sf.total_price_inr||0)+(sh.total_cost_inr||0)+other;
+  var cart_items=[
+    {label:'Flight: '+sf.airline+' '+( sf.flight_number||''),amount:{currency:'INR',value:sf.total_price_inr||0},pending:null},
+    {label:'Hotel: '+sh.name+' ('+(sh.total_nights||0)+' nights)',amount:{currency:'INR',value:sh.total_cost_inr||0},pending:null},
+    {label:'Transport & Meals',amount:{currency:'INR',value:other},pending:null}
   ];
-
   try{
-    const res=await fetch('/ap2-intent',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({trip_summary:ts,expense_estimate:{...exp,total_inr:selectedTotal},selected_flight:sf,selected_hotel:sh,cart_items})});
-    const data=await res.json();
-    (data.steps||[]).forEach(s=>addStep(s,s.includes('ap2.')||s.includes('Mandate')?'m':'i'));
-
+    var res=await fetch('/ap2-intent',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({trip_summary:ts,expense_estimate:{...exp,total_inr:selectedTotal},
+        selected_flight:sf,selected_hotel:sh,cart_items,
+        trip_type:tripType,
+        approver_email:tripType==='corporate'?(document.getElementById('approverEmail').value||''):'',
+      })});
+    var data=await res.json();
+    (data.steps||[]).forEach(function(s){addStep(s,s.includes('AP2')||s.includes('Mandate')?'m':'i');});
     if(data.status==='awaiting_user_confirmation'){
       apData=data; setStep(4);
-      // Show cart mandate
-      const cm=data.cart_mandate||{};
-      const contents=cm.contents||{};
-      const items=contents.payment_request?.details?.displayItems||[];
-      document.getElementById('cartItems').innerHTML=items.map(it=>`<div class="cmb-row"><span>${it.label}</span><span>₹${(it.amount?.value||0).toLocaleString('en-IN')}</span></div>`).join('');
-      const total=contents.payment_request?.details?.total?.amount||data.total||{};
-      document.getElementById('cartTotal').textContent=`₹${(total.value||0).toLocaleString('en-IN')}`;
-      const sig=cm.merchant_signature||'';
-      document.getElementById('sigDisplay').textContent=sig.substring(0,35)+'...';
+      var cm=data.cart_mandate||{};
+      var contents=cm.contents||{};
+      var items=contents.payment_request?.details?.displayItems||[];
+      document.getElementById('cartItems').innerHTML=items.map(function(it){
+        return '<div class="bill-row"><span>'+it.label+'</span><span>₹'+(it.amount?.value||0).toLocaleString('en-IN')+'</span></div>';
+      }).join('');
+      var total=contents.payment_request?.details?.total?.amount||data.total||{};
+      document.getElementById('cartTotal').textContent='₹'+(total.value||0).toLocaleString('en-IN');
+      if(tripType==='corporate'){
+        document.getElementById('payTitle').textContent='🏢 Bill Sent for Approval';
+        document.getElementById('billTitle').textContent='📋 Bill sent to your manager:';
+        var approver=document.getElementById('approverEmail').value||'your manager';
+        document.getElementById('corporateApprovalMsg').style.display='block';
+        document.getElementById('corporateApprovalMsg').innerHTML=
+          '📧 Your manager <strong>'+approver+'</strong> has received the bill via email.<br>'+
+          'Once they approve and authorize payment, your booking will be confirmed automatically.<br><br>'+
+          '<strong>For this demo:</strong> Click below to simulate manager approval:';
+        document.getElementById('cardSection').querySelector('label').textContent='Manager Card Last 4';
+        document.getElementById('payBtn').textContent='✅ Approve & Authorize Payment (Manager)';
+      } else {
+        document.getElementById('payTitle').textContent='💳 Your Bill — Confirm & Pay';
+        document.getElementById('billTitle').textContent='📋 Here\'s exactly what you\'re paying:';
+        document.getElementById('corporateApprovalMsg').style.display='none';
+        document.getElementById('payBtn').textContent='✅ Confirm & Pay — Complete Booking';
+      }
       document.getElementById('paySection').style.display='block';
       document.getElementById('paySection').scrollIntoView({behavior:'smooth',block:'start'});
-    }else if(data.error){
-      addStep(`❌ ${data.error}`);
-    }
-  }catch(e){addStep(`Error: ${e.message}`);}
-  btn.disabled=false; btn.textContent='🔐 Send IntentMandate to Payment Agent';
+    }else if(data.error){addStep('❌ '+data.error);}
+  }catch(e){addStep('❌ Error: '+e.message);}
+  btn.disabled=false;
+  btn.textContent=tripType==='corporate'?'📤 Send Bill to Manager for Approval':'📋 View My Bill & Pay';
 }
 
 async function sendPayment(){
-  const btn=document.getElementById('payBtn');
-  const last4=document.getElementById('cardLast4').value;
-  if(last4.length!==4){alert('Enter 4-digit card number');return;}
-  btn.disabled=true; btn.textContent='⏳ Signing & Sending PaymentMandate...';
-  setStep(5);
-  document.getElementById('mf3').className='mf-dot done'; document.getElementById('mf3').textContent='✓';
-  document.getElementById('mf4').className='mf-dot active'; document.getElementById('mf4').textContent='4';
-
+  var btn=document.getElementById('payBtn');
+  var last4=document.getElementById('cardLast4').value;
+  if(last4.length!==4){alert('Enter 4 digits');return;}
+  btn.disabled=true; btn.textContent='⏳ Processing payment...'; setStep(5);
   try{
-    const res=await fetch('/ap2-pay',{method:'POST',headers:{'Content-Type':'application/json'},
+    var res=await fetch('/ap2-pay',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({agent_url:apData.agent_url,cart_id:apData.cart_id,
         order_id:apData.order_id,total:apData.total,
         context_id:apData.context_id,task_id:apData.task_id,card_last4:last4})});
-    const data=await res.json();
-    (data.steps||[]).forEach(s=>addStep(s,s.includes('Mandate')?'m':'i'));
-
+    var data=await res.json();
+    (data.steps||[]).forEach(function(s){addStep(s,s.includes('Mandate')?'m':'i');});
     if(data.status==='success'){
       setStep(6);
-      document.getElementById('mf4').className='mf-dot done'; document.getElementById('mf4').textContent='✓';
       document.getElementById('successSec').style.display='block';
       document.getElementById('bkRef').textContent=data.booking_ref||'BKG------';
-      const ns=data.next_steps||[];
-      document.getElementById('nextSteps').innerHTML=ns.map(s=>`<div class="step" style="color:var(--muted)">→ ${s}</div>`).join('');
-      document.getElementById('actionCards').innerHTML=`<a class="acard" href="/calendar/${confirmedId||'none'}" download><div class="ico">📅</div><div class="at">Calendar (.ics)</div><div class="asu">Google Cal/Outlook</div></a><a class="acard" href="http://localhost:8000/audit" target="_blank"><div class="ico">📋</div><div class="at">Audit Log</div><div class="asu">Full flow record</div></a><a class="acard" href="http://localhost:8000/analytics" target="_blank"><div class="ico">📊</div><div class="at">Analytics</div><div class="asu">Platform stats</div></a>`;
+      document.getElementById('bkSub').textContent=
+        tripType==='corporate'?'Booking confirmed. Confirmation email sent to you and your manager.':
+        'Booking confirmed. Confirmation email sent to you.';
+      var ns=data.next_steps||[];
+      document.getElementById('nextSteps').innerHTML=ns.map(function(s){return '<div class="step" style="color:var(--muted)">→ '+s+'</div>';}).join('');
+      document.getElementById('actionCards').innerHTML=
+        '<a class="acard" href="/calendar/none" download><div class="ico">📅</div><div class="at">Add to Calendar</div><div class="asu">.ics file</div></a>'+
+        '<a class="acard" href="'+REG+'/audit" target="_blank"><div class="ico">📋</div><div class="at">View Audit Log</div><div class="asu">Full flow record</div></a>'+
+        '<a class="acard" href="'+REG+'/analytics" target="_blank"><div class="ico">📊</div><div class="at">Analytics</div><div class="asu">Platform stats</div></a>';
       document.getElementById('successSec').scrollIntoView({behavior:'smooth',block:'start'});
-    }else{addStep(`❌ ${data.error||'Payment failed'}`);}
-  }catch(e){addStep(`Error: ${e.message}`);}
-  btn.disabled=false; btn.textContent='🔐 Sign & Send PaymentMandate';
+    }else{addStep('❌ '+(data.error||'Payment failed'));}
+  }catch(e){addStep('❌ Error: '+e.message);}
+  btn.disabled=false; btn.textContent='✅ Confirm & Pay — Complete Booking';
 }
 </script>
 </body>
