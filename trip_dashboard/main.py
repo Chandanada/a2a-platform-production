@@ -431,6 +431,28 @@ async def ap2_pay(request: Request):
         step(f"❌ {report['error']}")
 
     report["raw_result"] = result
+
+    # Log to audit on success
+    if report["status"] == "success":
+        try:
+            flow_id = f"trip-{uuid.uuid4().hex[:12]}"
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(f"{REGISTRY_URL}/registry/audit/create", json={
+                    "flow_id": flow_id, "flow_type": "travel",
+                    "title": f"Trip booking {report.get('booking_ref','')[:12]}",
+                    "subtitle": f"Card ending {card_last4}",
+                    "location": "", "experience_years": 0
+                })
+                await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
+                    "flow_id": flow_id, "status": "completed",
+                    "agents_used": '["Travel Agent","AP2 Payment Agent"]',
+                    "result_count": 1,
+                    "result_data": '{{"booking_ref":"{}","amount":{}}}'.format(report.get("booking_ref",""), total.get("value",0)),
+                    "completed_at": "now"
+                })
+        except Exception as e:
+            print(f"[Trip audit] error: {e}")
+
     return JSONResponse(report)
 
 
@@ -701,7 +723,7 @@ function setTripType(type){
   tripType=type;
   var corp=document.getElementById('ttCorp');
   var pers=document.getElementById('ttPers');
-  // Reset both
+  // Reset both styles
   corp.style.borderColor=''; corp.style.background=''; corp.style.color='';
   pers.style.borderColor=''; pers.style.background=''; pers.style.color='';
   // Highlight selected
@@ -711,7 +733,16 @@ function setTripType(type){
   active.style.color='#fbbf24';
   document.getElementById('approverRow').style.display=type==='corporate'?'flex':'none';
   updateHowBanner();
-  if(sf&&sh) chk();
+  // Reset entire flow when switching trip type
+  sf=null; sh=null; apData=null;
+  document.getElementById('result').style.display='none';
+  document.getElementById('steps').innerHTML='';
+  document.getElementById('optCard').style.display='none';
+  document.getElementById('paySection').style.display='none';
+  document.getElementById('successSec').style.display='none';
+  document.getElementById('planBtn').disabled=false;
+  document.getElementById('planBtn').textContent='✈️ Find Flights & Hotels';
+  setStep(1);
 }
 
 function updateHowBanner(){
@@ -929,6 +960,8 @@ async function sendPayment(){
     (data.steps||[]).forEach(function(s){addStep(s,s.includes('Mandate')?'m':'i');});
     if(data.status==='success'){
       setStep(6);
+      // Hide the payment section — booking is done, no more CTAs needed
+      document.getElementById('paySection').style.display='none';
       document.getElementById('successSec').style.display='block';
       document.getElementById('bkRef').textContent=data.booking_ref||'BKG------';
       document.getElementById('bkSub').textContent=
