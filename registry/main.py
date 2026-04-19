@@ -191,6 +191,13 @@ def register_page(request: Request):
 @app.post("/register", response_class=HTMLResponse)
 async def register_form(request: Request):
     form = await request.form()
+    # Validate API key from form
+    submitted_key = form.get("api_key", "").strip()
+    if not verify_api_key(submitted_key):
+        agents = get_all_agents()
+        return templates.TemplateResponse("register.html",
+            {"request": request, "registry_url": REGISTRY_URL,
+             "api_key": API_KEY, "error": "Invalid API key. Contact the platform admin."})
     skills = [{"id": form.get("skill_id",""), "name": form.get("skill_name","")}]
     try:
         agent = register_agent(
@@ -201,7 +208,6 @@ async def register_form(request: Request):
             tags        = [t.strip() for t in form.get("tags","").split(",") if t.strip()],
             version     = form.get("version","1.0.0")
         )
-        agents = get_all_agents()
         return templates.TemplateResponse("register.html",
             {"request": request, "registry_url": REGISTRY_URL,
              "api_key": API_KEY, "success": True,

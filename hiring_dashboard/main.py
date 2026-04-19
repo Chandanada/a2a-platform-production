@@ -565,11 +565,14 @@ function updatePipeline(currentStep) {{
 
 async function startHiring() {{
   const btn = document.getElementById('btn');
+  if (!btn) return;
   btn.disabled = true; btn.textContent = '⏳ Sourcing candidates + scheduling Round 1...';
-  document.getElementById('result').style.display = 'block';
-  document.getElementById('steps').innerHTML = '';
+  const resultEl = document.getElementById('result');
+  if (resultEl) resultEl.style.display = 'block';
+  const stepsEl = document.getElementById('steps');
+  if (stepsEl) stepsEl.innerHTML = '';
   ['candidatesSection','round1Section','round2Section','round3Section','bgSection','pipelineBar']
-    .forEach(id => document.getElementById(id).style.display = 'none');
+    .forEach(id => {{ const el = document.getElementById(id); if (el) el.style.display = 'none'; }});
 
   try {{
     const res = await fetch('/hire', {{

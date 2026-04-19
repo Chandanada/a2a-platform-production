@@ -57,7 +57,12 @@
   {% endif %}
 
   <div class="card">
-    <form method="POST" action="/register">
+    <form method="POST" action="/register" onsubmit="return checkCaptcha()">
+      <div class="field">
+        <label>🔑 Admin API Key *</label>
+        <input name="api_key" type="password" placeholder="Enter admin API key to register" required autocomplete="off"/>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Required. Contact platform admin if you don't have this.</div>
+      </div>
       <div class="field"><label>Agent Name *</label><input name="name" placeholder="Sourcing Agent" required/></div>
       <div class="field"><label>Agent URL *</label><input name="agent_url" placeholder="https://your-agent.up.railway.app" required/></div>
       <div class="field"><label>Description</label><textarea name="description" placeholder="What does this agent do?"></textarea></div>
@@ -65,6 +70,13 @@
       <div class="field"><label>Skill Name</label><input name="skill_name" placeholder="Find Candidates"/></div>
       <div class="field"><label>Tags (comma separated)</label><input name="tags" placeholder="hiring, sourcing, github"/></div>
       <div class="field"><label>Version</label><input name="version" value="1.0.0"/></div>
+      <div class="field">
+        <label>🤖 Human Verification *</label>
+        <div style="display:flex;align-items:center;gap:12px;background:#080c1a;border:1px solid var(--border);border-radius:8px;padding:12px">
+          <span id="captchaQuestion" style="font-size:15px;font-weight:700;color:var(--violet);min-width:120px"></span>
+          <input id="captchaAnswer" name="captcha_answer" type="number" placeholder="Your answer" required style="width:120px;flex:none"/>
+        </div>
+      </div>
       <button type="submit" class="btn">Register Agent</button>
     </form>
   </div>
@@ -81,5 +93,27 @@ X-API-Key: {{ api_key }}<br>
     </div>
   </div>
 </div>
+<script>
+  let _captchaAnswer = 0;
+  function genCaptcha() {
+    const a = Math.floor(Math.random()*20)+1;
+    const b = Math.floor(Math.random()*20)+1;
+    const ops = [['+', a+b],['-', a-b],['×', a*b]];
+    const [sym, ans] = ops[Math.floor(Math.random()*ops.length)];
+    _captchaAnswer = ans;
+    document.getElementById('captchaQuestion').textContent = `What is ${a} ${sym} ${b}?`;
+    document.getElementById('captchaAnswer').value = '';
+  }
+  function checkCaptcha() {
+    const entered = parseInt(document.getElementById('captchaAnswer').value);
+    if (entered !== _captchaAnswer) {
+      alert('❌ Wrong answer. Please solve the math question correctly.');
+      genCaptcha();
+      return false;
+    }
+    return true;
+  }
+  genCaptcha();
+</script>
 </body>
 </html>
