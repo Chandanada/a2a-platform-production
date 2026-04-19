@@ -65,6 +65,9 @@ AGENT_CARD = {
 def agent_card():
     return JSONResponse(content=AGENT_CARD)
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "Travel Agent"}
 
 async def call_groq(prompt: str) -> dict:
     resp = groq_client.chat.completions.create(

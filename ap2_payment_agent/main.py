@@ -22,6 +22,9 @@ NOTIFY_EMAILS       = os.getenv("INTERVIEW_NOTIFY_EMAILS",
 AP2_EXTENSION_URI = "https://github.com/google-agentic-commerce/ap2/tree/v0.1"
 
 app = FastAPI(title="AP2 Payment Agent", version="0.1.0")
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "ap2_payment_agent"}
 
 # In-memory cart store
 _pending_carts: dict = {}

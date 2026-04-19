@@ -48,7 +48,7 @@ async def discover_agent(skill: str) -> dict | None:
 
 async def send_a2a(agent_url: str, parts: list,
                    context_id: str = None, task_id: str = None) -> dict:
-    """Send A2A message with AP2 extension header."""
+    """Send A2A message with AP2 extension header. Retries once on empty/error response."""
     payload = {
         "jsonrpc": "2.0",
         "id":      f"req-{uuid.uuid4().hex[:8]}",
@@ -64,13 +64,34 @@ async def send_a2a(agent_url: str, parts: list,
         }
     }
     headers = {
-        "Content-Type":      "application/json",
-        # AP2 extension header — marks this as an AP2 transaction
-        "X-A2A-Extensions":  AP2_EXTENSION_URI
+        "Content-Type":     "application/json",
+        "X-A2A-Extensions": AP2_EXTENSION_URI
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.post(agent_url, json=payload, headers=headers)
-        return r.json()
+    import asyncio
+    last_err = "No response"
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                r = await client.post(agent_url, json=payload, headers=headers)
+                if r.status_code >= 500:
+                    last_err = f"HTTP {r.status_code}"
+                    if attempt < 2:
+                        await asyncio.sleep(15)
+                        continue
+                try:
+                    return r.json()
+                except Exception:
+                    if r.text:
+                        return {"error": f"Non-JSON response (HTTP {r.status_code}): {r.text[:200]}"}
+                    last_err = f"Empty response (HTTP {r.status_code})"
+                    if attempt < 2:
+                        await asyncio.sleep(15)
+                        continue
+        except Exception as e:
+            last_err = str(e)
+            if attempt < 2:
+                await asyncio.sleep(15)
+    return {"error": last_err}
 
 
 def extract(resp: dict) -> dict:
@@ -142,13 +163,13 @@ async def plan_trip(request: Request):
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
 
-    # Wake up Render service
+    # Wake up Render service — ping the agent card endpoint (no /health on travel agent)
     step("🔔 Waking up Travel Agent (Render cold start may take 30s)...")
     import asyncio
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=35.0) as client:
-                ping = await client.get(f"{url}/health")
+                ping = await client.get(f"{url}/.well-known/agent-card.json")
                 if ping.status_code < 500:
                     step("✅ Travel Agent is awake")
                     break

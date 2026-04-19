@@ -17,6 +17,9 @@ AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:8006")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 app = FastAPI(title="HR Ops Agent", version="1.0.0")
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "hr_ops_agent"}
 
 AGENT_CARD = {
     "name":        "HR Ops Agent",
