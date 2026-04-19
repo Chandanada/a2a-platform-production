@@ -644,6 +644,11 @@ async def hr_ops(request: Request):
         report["result"] = result
         report["status"] = "completed"
         step("✅ HR Ops task completed!")
+        # Log to audit trail
+        try:
+            await _log_hr_audit(flow_id, task, "completed")
+        except Exception:
+            pass
     except Exception as e:
         report["status"] = "failed"
         report["error"]  = str(e)[:120]
@@ -1035,19 +1040,18 @@ import json as _json_hr
 
 async def _log_hr_audit(flow_id, task, status="completed"):
     try:
-        reg = os.getenv("REGISTRY_URL", "http://localhost:8000")
         labels = {
             "generate_offer_letter": "Offer Letter Generated",
             "review_contract":       "Contract Reviewed",
             "process_payroll":       "Payroll Processed"
         }
         async with _httpx_hr.AsyncClient(timeout=5.0) as client:
-            await client.post(f"{reg}/registry/audit/create", json={
+            await client.post(f"{REGISTRY_URL}/registry/audit/create", json={
                 "flow_id": flow_id, "flow_type": "hr_ops",
                 "title":   labels.get(task, task),
                 "subtitle": task, "location": "HR Operations"
             })
-            await client.post(f"{reg}/registry/audit/save", json={
+            await client.post(f"{REGISTRY_URL}/registry/audit/save", json={
                 "flow_id": flow_id, "status": status,
                 "agents_used": _json_hr.dumps(["HR Ops Agent"]),
                 "result_count": 1, "completed_at": "now"
