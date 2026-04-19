@@ -5,22 +5,302 @@ Discovers HR Ops Agent from registry and performs:
 - Contract review  
 - Payroll processing
 """
-import os, uuid, json, httpx
+import os, uuid, json, httpx, smtplib, hashlib, base64
+from io import BytesIO
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 
 load_dotenv()
-REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8000")
+REGISTRY_URL    = os.getenv("REGISTRY_URL", "http://localhost:8000")
+HR_DASHBOARD_URL = os.getenv("HR_DASHBOARD_URL", "https://hr-dashboard-ttt2.onrender.com")
+GMAIL_SENDER    = os.getenv("GMAIL_SENDER", "chandannov2291@gmail.com")
+GMAIL_APP_PASS  = os.getenv("GMAIL_APP_PASS", "unkfnvhzezhpsycf")
+OFFER_SECRET    = os.getenv("OFFER_SECRET", "hr-offer-secret-2026")
 app = FastAPI(title="HR Ops Dashboard", version="1.0.0")
 
 
+def generate_offer_pdf(ol: dict, company: str) -> bytes:
+    """Generate a professional offer letter PDF using fpdf2."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return b""
+
+    comp = ol.get("compensation", {})
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(20, 20, 20)
+
+    # Header bar
+    pdf.set_fill_color(30, 20, 60)
+    pdf.rect(0, 0, 210, 28, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_xy(20, 8)
+    pdf.cell(0, 12, company, ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_xy(20, 19)
+    pdf.cell(0, 6, "OFFER OF EMPLOYMENT — CONFIDENTIAL", ln=True)
+
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_y(36)
+
+    # Date & ref
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, f"Date: {ol.get('date', datetime.now().strftime('%B %d, %Y'))}", ln=True)
+    pdf.ln(4)
+
+    # Greeting
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"Dear {ol.get('candidate_name', 'Candidate')},", ln=True)
+    pdf.ln(2)
+
+    # Body
+    pdf.set_font("Helvetica", "", 10)
+    body = ol.get("letter_body", f"We are delighted to offer you the position of {ol.get('role','Software Engineer')} at {company}.")
+    pdf.multi_cell(0, 6, body[:800])
+    pdf.ln(6)
+
+    # Compensation table
+    pdf.set_fill_color(245, 240, 255)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(60, 30, 120)
+    pdf.cell(0, 9, "COMPENSATION & BENEFITS", ln=True, fill=True)
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_font("Helvetica", "", 10)
+
+    rows = [
+        ("Annual CTC", f"INR {comp.get('annual_ctc_lpa', ol.get('ctc_lpa',''))} LPA"),
+        ("Role / Designation", ol.get("role", "")),
+        ("Department", ol.get("department", "Engineering")),
+        ("Reporting To", ol.get("reporting_to", "Engineering Manager")),
+        ("Location", ol.get("location", "")),
+        ("Joining Date", ol.get("joining_date", "")),
+        ("Probation Period", ol.get("probation_period", "3 months")),
+        ("Notice Period", ol.get("notice_period", "2 months")),
+        ("Offer Valid Until", ol.get("offer_validity", "7 days from issue")),
+    ]
+    for label, val in rows:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(70, 7, label, border="B")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 7, str(val), border="B", ln=True)
+
+    pdf.ln(5)
+    # Benefits
+    pdf.set_fill_color(230, 255, 240)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(10, 100, 60)
+    pdf.cell(0, 9, "BENEFITS INCLUDED", ln=True, fill=True)
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_font("Helvetica", "", 10)
+    for b in ol.get("benefits", []):
+        pdf.cell(6, 6, "\x95")
+        pdf.cell(0, 6, b, ln=True)
+
+    pdf.ln(8)
+    # E-signature section
+    pdf.set_fill_color(255, 245, 230)
+    pdf.set_draw_color(200, 140, 0)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(150, 80, 0)
+    pdf.cell(0, 9, "E-SIGNATURE REQUIRED", ln=True, fill=True)
+    pdf.set_text_color(60, 60, 60)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6,
+        "Please review the terms above carefully. By clicking the acceptance link in your email, "
+        "you confirm that you have read, understood, and agree to all terms of this offer. "
+        "Your acceptance constitutes a legally binding agreement.")
+    pdf.ln(4)
+
+    # Signature lines
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(80, 6, "Authorised Signatory:", border=0)
+    pdf.cell(30, 6, "", border=0)
+    pdf.cell(80, 6, "Candidate Acceptance:", border=0, ln=True)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(80, 8, ol.get("signatory", f"HR Manager, {company}"), border="T")
+    pdf.cell(30, 8, "", border=0)
+    pdf.cell(80, 8, "(via email acceptance link)", border="T", ln=True)
+
+    # Footer
+    pdf.set_y(-18)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 6, f"This is a system-generated offer letter from {company} | Confidential", align="C")
+
+    return bytes(pdf.output())
+
+
+def send_offer_email(candidate_email: str, candidate_name: str, role: str,
+                     company: str, pdf_bytes: bytes, accept_url: str) -> bool:
+    """Send offer letter PDF to candidate with acceptance link."""
+    if not GMAIL_SENDER or not GMAIL_APP_PASS:
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Offer Letter — {role} at {company}"
+        msg["From"]    = f"{company} HR <{GMAIL_SENDER}>"
+        msg["To"]      = candidate_email
+
+        html_body = f"""
+<!DOCTYPE html><html>
+<body style="font-family:'Segoe UI',sans-serif;background:#f8fafc;padding:20px">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <div style="background:linear-gradient(135deg,#1e0a3c,#3b1278);padding:28px 32px">
+    <h1 style="color:#fff;margin:0;font-size:20px">🎉 Congratulations, {candidate_name}!</h1>
+    <p style="color:#c4b5fd;margin:8px 0 0;font-size:13px">{company} — Offer of Employment</p>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="color:#1e293b;font-size:15px;line-height:1.7">
+      We are thrilled to extend an offer of employment for the position of <strong>{role}</strong> at <strong>{company}</strong>.
+    </p>
+    <p style="color:#64748b;font-size:14px;line-height:1.7">
+      Please find your detailed offer letter attached as a PDF. Kindly review all the terms and conditions carefully before accepting.
+    </p>
+
+    <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin:20px 0;text-align:center">
+      <p style="color:#64748b;font-size:13px;margin:0 0 16px">Once you have reviewed your offer letter, please click below to formally accept:</p>
+      <a href="{accept_url}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px">
+        ✅ Accept Offer Letter
+      </a>
+      <p style="color:#94a3b8;font-size:11px;margin:12px 0 0">By clicking, you confirm your agreement to all terms in the attached PDF.</p>
+    </div>
+
+    <div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:16px">
+      <p style="color:#94a3b8;font-size:12px;margin:0">
+        ⚠️ This offer is valid for <strong>7 days</strong> from the date of issue.<br/>
+        For any queries, reply to this email.
+      </p>
+    </div>
+  </div>
+  <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
+    <p style="color:#94a3b8;font-size:11px;margin:0">Generated by A2A HR Platform · {company}</p>
+  </div>
+</div>
+</body></html>"""
+
+        msg.attach(MIMEText(html_body, "html"))
+
+        # Attach PDF
+        if pdf_bytes:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(pdf_bytes)
+            encoders.encode_base64(part)
+            safe_name = f"Offer_Letter_{candidate_name.replace(' ','_')}.pdf"
+            part.add_header("Content-Disposition", f'attachment; filename="{safe_name}"')
+            msg.attach(part)
+
+        # Try port 587
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=25) as smtp:
+                smtp.ehlo(); smtp.starttls(); smtp.ehlo()
+                smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+                smtp.sendmail(GMAIL_SENDER, [candidate_email], msg.as_string())
+            return True
+        except Exception:
+            pass
+        # Try port 465
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=25) as smtp:
+            smtp.login(GMAIL_SENDER, GMAIL_APP_PASS)
+            smtp.sendmail(GMAIL_SENDER, [candidate_email], msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[offer email] error: {e}")
+        return False
+
+
+def make_accept_token(candidate_name: str, role: str, company: str) -> str:
+    raw = f"{candidate_name}|{role}|{company}|{OFFER_SECRET}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
+
+
+@app.post("/send-offer-email")
+async def send_offer_email_endpoint(request: Request):
+    """Generate PDF + send offer letter email to candidate."""
+    body           = await request.json()
+    offer_data     = body.get("offer_data", {})
+    candidate_email = body.get("candidate_email", "")
+    ol = offer_data.get("offer_letter", offer_data)
+
+    if not candidate_email:
+        return JSONResponse({"success": False, "error": "candidate_email required"})
+
+    candidate_name = ol.get("candidate_name", "Candidate")
+    role           = ol.get("role", "Software Engineer")
+    company        = ol.get("company_name") or body.get("company_name", "TechCorp India Pvt. Ltd.")
+
+    # Build acceptance URL with token
+    token      = make_accept_token(candidate_name, role, company)
+    accept_url = f"{HR_DASHBOARD_URL}/accept-offer?token={token}&name={candidate_name.replace(' ','%20')}&role={role.replace(' ','%20')}&company={company.replace(' ','%20')}"
+
+    # Generate PDF
+    pdf_bytes = generate_offer_pdf(ol, company)
+
+    # Send email
+    sent = send_offer_email(candidate_email, candidate_name, role, company, pdf_bytes, accept_url)
+
+    return JSONResponse({
+        "success": sent,
+        "email_sent_to": candidate_email,
+        "accept_url": accept_url,
+        "pdf_generated": len(pdf_bytes) > 0,
+        "message": f"Offer letter emailed to {candidate_email} with PDF and acceptance link" if sent else "Email failed — check GMAIL_SENDER/GMAIL_APP_PASS env vars"
+    })
+
+
+@app.get("/accept-offer")
+async def accept_offer_page(token: str = "", name: str = "", role: str = "", company: str = ""):
+    """Candidate lands here after clicking Accept in email."""
+    expected = make_accept_token(name, role, company)
+    valid    = token == expected
+    timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+
+    if valid:
+        html = f"""<!DOCTYPE html><html>
+<head><meta charset="UTF-8"/><title>Offer Accepted — {company}</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0a0f1e,#1a0a3c);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}}.card{{background:#fff;border-radius:20px;padding:48px;max-width:560px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}}.icon{{font-size:64px;margin-bottom:20px}}.title{{font-size:28px;font-weight:800;color:#1e293b;margin-bottom:8px}}.sub{{color:#64748b;font-size:15px;line-height:1.7;margin-bottom:28px}}.badge{{display:inline-flex;align-items:center;gap:8px;background:#ecfdf5;border:1px solid #6ee7b7;color:#047857;padding:10px 24px;border-radius:30px;font-size:14px;font-weight:700;margin-bottom:28px}}.info{{background:#f8fafc;border-radius:12px;padding:20px;text-align:left;margin-bottom:20px}}.info-row{{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px}}.info-row:last-child{{border:none}}.info-label{{color:#64748b}}.info-val{{font-weight:600;color:#1e293b}}.ts{{font-size:12px;color:#94a3b8}}</style>
+</head><body>
+<div class="card">
+  <div class="icon">🎉</div>
+  <h1 class="title">Offer Accepted!</h1>
+  <p class="sub">Congratulations, <strong>{name}</strong>! Your acceptance has been recorded. The HR team will reach out shortly with next steps.</p>
+  <div class="badge">✅ E-Signature Confirmed</div>
+  <div class="info">
+    <div class="info-row"><span class="info-label">Candidate</span><span class="info-val">{name}</span></div>
+    <div class="info-row"><span class="info-label">Role</span><span class="info-val">{role}</span></div>
+    <div class="info-row"><span class="info-label">Company</span><span class="info-val">{company}</span></div>
+    <div class="info-row"><span class="info-label">Accepted On</span><span class="info-val">{timestamp}</span></div>
+  </div>
+  <p class="ts">This acceptance is digitally recorded via A2A HR Platform. Reference: {token[:12].upper()}</p>
+</div>
+</body></html>"""
+    else:
+        html = """<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px">
+<h1>❌ Invalid or Expired Link</h1>
+<p>This acceptance link is invalid. Please contact HR for a new offer letter.</p></body></html>"""
+
+    return HTMLResponse(html)
+
+
 async def discover_agent(skill: str) -> dict | None:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f"{REGISTRY_URL}/registry/discover",
-                             params={"skill": skill}, timeout=10.0)
-        agents = r.json().get("agents", [])
-        return agents[0] if agents else None
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{REGISTRY_URL}/registry/discover",
+                                 params={"skill": skill}, timeout=10.0)
+            agents = r.json().get("agents", [])
+            return agents[0] if agents else None
+    except Exception as e:
+        print(f"[discover_agent] skill={skill} error: {e}")
+        return None
 
 
 async def send_message(agent_url: str, text: str, data: dict = None) -> dict:
@@ -30,10 +310,24 @@ async def send_message(agent_url: str, text: str, data: dict = None) -> dict:
     payload = {"jsonrpc": "2.0", "id": f"req-{str(uuid.uuid4())[:8]}",
                "method": "SendMessage",
                "params": {"message": {"role": "user", "messageId": str(uuid.uuid4()), "parts": parts}}}
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.post(agent_url, json=payload)
-        return r.json()
-
+    import asyncio
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                r = await client.post(agent_url, json=payload)
+                if r.status_code >= 500:
+                    if attempt < 2: await asyncio.sleep(15); continue
+                    return {"error": f"HTTP {r.status_code} after retries"}
+                try:
+                    return r.json()
+                except Exception:
+                    if r.text and attempt == 2:
+                        return {"error": f"Non-JSON (HTTP {r.status_code}): {r.text[:200]}"}
+                    if attempt < 2: await asyncio.sleep(15); continue
+        except Exception as e:
+            if attempt < 2: await asyncio.sleep(15); continue
+            return {"error": str(e)}
+    return {"error": "All retries failed"}
 
 def extract_artifact(resp: dict) -> dict:
     try:
@@ -55,40 +349,64 @@ async def registry_status():
 
 @app.post("/hr-ops")
 async def hr_ops(request: Request):
+  try:
     body    = await request.json()
     task    = body.get("task", "generate_offer_letter")
     flow_id = str(uuid.uuid4())
     report  = {"flow_id": flow_id, "steps": [], "result": {}, "status": "in_progress", "task": task}
     def step(msg): report["steps"].append(msg)
 
-    # Map task to skill
-    skill_map = {
-        "generate_offer_letter": "generate_offer_letter",
-        "review_contract":       "review_contract",
-        "process_payroll":       "process_payroll",
-    }
-    skill = skill_map.get(task, "generate_offer_letter")
+    # All 3 tasks use the same hr_ops skill — that's what the agent is registered with
+    skill = "hr_ops"
 
-    step(f"🔍 Querying registry for HR Ops Agent (skill: {skill})...")
+    step("🔍 Querying registry for HR Ops Agent...")
     agent = await discover_agent(skill)
     if not agent:
         report["status"] = "failed"
-        report["error"]  = "No HR Ops Agent registered. Go to localhost:8000/register to add one."
-        return JSONResponse(report, status_code=404)
+        report["error"]  = "No HR Ops Agent found in registry. Register it with skill: hr_ops"
+        return JSONResponse(report)
 
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
-    step("📋 Fetching Agent Card...")
-    async with httpx.AsyncClient() as client:
-        card = (await client.get(f"{url}/.well-known/agent-card.json", timeout=8.0)).json()
-    step(f"✅ Agent Card — Skills: {[s['id'] for s in card.get('skills', [])]}")
+
+    # Wake up Render — free tier cold starts return 502
+    step("🔔 Waking up HR Ops Agent (Render cold start may take 30s)...")
+    import asyncio
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=35.0) as client:
+                ping = await client.get(f"{url}/health")
+                if ping.status_code < 500:
+                    step("✅ HR Ops Agent is awake")
+                    break
+                if attempt < 2:
+                    step(f"⏳ Still starting, waiting... (attempt {attempt+1}/3)")
+                    await asyncio.sleep(15)
+        except Exception:
+            if attempt < 2:
+                await asyncio.sleep(15)
+
     step(f"📤 Sending {task} request via A2A SendMessage...")
-    resp   = await send_message(url, f"HR Ops task: {task}", data=body)
-    result = extract_artifact(resp)
-    report["result"] = result
-    report["status"] = "completed"
-    step("✅ HR Ops task completed!")
+    try:
+        resp = await send_message(url, f"HR Ops task: {task}", data=body)
+        if resp.get("error") and "result" not in resp:
+            report["status"] = "failed"
+            report["error"]  = resp.get("error", "Agent error")[:120]
+            step(f"❌ {report['error']}")
+            return JSONResponse(report)
+        result = extract_artifact(resp)
+        report["result"] = result
+        report["status"] = "completed"
+        step("✅ HR Ops task completed!")
+    except Exception as e:
+        report["status"] = "failed"
+        report["error"]  = str(e)[:120]
+        step(f"❌ {report['error']}")
+
     return JSONResponse(report)
+
+  except Exception as e:
+    return JSONResponse({"steps": [f"❌ Server error: {str(e)}"], "status": "failed", "result": {}})
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -167,9 +485,9 @@ async def home():
       <span class="brand-name">HR Ops Dashboard</span>
     </div>
     <div class="nav-links">
-      <a href="http://localhost:8000" target="_blank">Registry</a>
-      <a href="http://localhost:8003" target="_blank">Hiring</a>
-      <a href="http://localhost:8007" target="_blank">Travel</a>
+      <a href="https://a2a-platform-production-production.up.railway.app" target="_blank">Registry</a>
+      <a href="https://hiring-dashboard-cpcp.onrender.com" target="_blank">Hiring</a>
+      <a href="https://trip-dashboard-xav2.onrender.com" target="_blank">Travel</a>
     </div>
   </nav>
 
@@ -192,6 +510,7 @@ async def home():
       <div class="grid2">
         <div class="field"><label>Candidate Name</label><input id="o-name" value="Rajesh Kumar"/></div>
         <div class="field"><label>Role / Designation</label><input id="o-role" value="Senior Python Engineer"/></div>
+        <div class="field"><label>Candidate Email *</label><input id="o-email" type="email" value="chandannov2291@gmail.com" placeholder="candidate@email.com"/></div>
       </div>
       <div class="grid3">
         <div class="field"><label>CTC (LPA)</label><input id="o-ctc" type="number" value="18"/></div>
@@ -275,10 +594,10 @@ async function checkRegistry() {
     if (d.status === 'ok' && d.registered_agents > 0) {
       bar.className = 'status-bar ok';
       bar.innerHTML = `✅ <strong>${d.registered_agents} agent(s) registered.</strong>
-        <a href="http://localhost:8000" target="_blank" style="color:#f9a8d4;margin-left:10px;font-weight:600">→ Registry</a>`;
+        <a href="https://a2a-platform-production-production.up.railway.app" target="_blank" style="color:#f9a8d4;margin-left:10px;font-weight:600">→ Registry</a>`;
     } else {
       bar.className = 'status-bar error';
-      bar.innerHTML = `❌ No agents registered. <a href="http://localhost:8000/register" target="_blank" style="color:#f9a8d4;margin-left:8px;font-weight:600">→ Register HR Ops Agent</a>`;
+      bar.innerHTML = `❌ No agents registered. <a href="https://a2a-platform-production-production.up.railway.app/register" target="_blank" style="color:#f9a8d4;margin-left:8px;font-weight:600">→ Register HR Ops Agent</a>`;
     }
   } catch(e) { bar.className = 'status-bar error'; bar.innerHTML = '❌ Registry not reachable.'; }
 }
@@ -322,12 +641,13 @@ async function runTask(t) {
     if (data.error) {
       const d = document.createElement('div');
       d.className = 'step err';
-      d.innerHTML = `❌ ${data.error} <a href="http://localhost:8000/register" target="_blank" style="color:#f9a8d4;margin-left:6px">→ Register HR Ops Agent</a>`;
+      d.innerHTML = `❌ ${data.error} <a href="https://a2a-platform-production-production.up.railway.app/register" target="_blank" style="color:#f9a8d4;margin-left:6px">→ Register HR Ops Agent</a>`;
       el.appendChild(d);
     }
     if (data.result && Object.keys(data.result).length > 0) {
       document.getElementById('resultCard').style.display = 'block';
       renderResult(t, data.result);
+      if (t === 'offer') window._lastOfferData = data.result;
     }
     checkRegistry();
   } catch(e) {
@@ -366,6 +686,18 @@ function renderResult(t, res) {
       <div class="result-section">
         <h3>Next Steps</h3>
         <div style="font-size:13px;color:var(--muted)">${(res.next_steps||[]).join('<br>')}</div>
+      </div>
+      <div class="result-section">
+        <h3>📧 Send to Candidate</h3>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="send-email-addr" type="email" placeholder="candidate@email.com"
+            value="${document.getElementById('o-email')?.value||''}"
+            style="flex:1;min-width:200px;background:#080c1a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13px;outline:none"/>
+          <button onclick="sendOfferEmail()" style="background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;border:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">
+            📧 Email PDF + Acceptance Link
+          </button>
+        </div>
+        <div id="email-status" style="margin-top:10px;font-size:13px"></div>
       </div>
       <div class="result-section"><h3>Full Details (JSON)</h3><pre>${JSON.stringify(res,null,2)}</pre></div>`;
   } else if (t === 'contract') {
@@ -415,6 +747,35 @@ function renderResult(t, res) {
         </div>`).join('')}
       </div>
       <div class="result-section"><h3>Full Details (JSON)</h3><pre>${JSON.stringify(res,null,2)}</pre></div>`;
+  }
+}
+async function sendOfferEmail() {
+  const email = document.getElementById('send-email-addr')?.value?.trim();
+  const statusEl = document.getElementById('email-status');
+  if (!email) { statusEl.innerHTML = '<span style="color:#f87171">Please enter candidate email</span>'; return; }
+  if (!window._lastOfferData) { statusEl.innerHTML = '<span style="color:#f87171">Generate offer letter first</span>'; return; }
+
+  statusEl.innerHTML = '<span style="color:#a78bfa">⏳ Generating PDF and sending email...</span>';
+
+  try {
+    const res = await fetch('/send-offer-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        offer_data: window._lastOfferData,
+        candidate_email: email,
+        company_name: document.getElementById('o-company')?.value || 'TechCorp India Pvt. Ltd.'
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      statusEl.innerHTML = `<span style="color:#10b981">✅ ${data.message}</span><br/>
+        <span style="font-size:11px;color:#64748b">Acceptance link: <a href="${data.accept_url}" target="_blank" style="color:#a78bfa">${data.accept_url.substring(0,60)}...</a></span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:#f87171">❌ ${data.error || data.message}</span>`;
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:#f87171">❌ Error: ${e.message}</span>`;
   }
 }
 </script>
