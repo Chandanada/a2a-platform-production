@@ -25,120 +25,237 @@ OFFER_SECRET    = os.getenv("OFFER_SECRET", "hr-offer-secret-2026")
 app = FastAPI(title="HR Ops Dashboard", version="1.0.0")
 
 
+def _make_fallback_pdf(ol: dict, company: str) -> bytes:
+    """Pure-Python minimal PDF — no dependencies, always works."""
+    comp   = ol.get("compensation", {})
+    name   = ol.get("candidate_name", "Candidate")
+    role   = ol.get("role", "Software Engineer")
+    ctc    = comp.get("annual_ctc_lpa", ol.get("ctc_lpa", ""))
+    join   = ol.get("joining_date", "")
+    loc    = ol.get("location", "")
+    dept   = ol.get("department", "Engineering")
+    prob   = ol.get("probation_period", "3 months")
+    notice = ol.get("notice_period", "2 months")
+    valid  = ol.get("offer_validity", "7 days from issue")
+    sign   = ol.get("signatory", f"HR Manager, {company}")
+    body   = ol.get("letter_body", f"We are delighted to offer you the position of {role} at {company}.")[:1200]
+    bens   = ol.get("benefits", [])
+    date   = ol.get("date", datetime.now().strftime("%B %d, %Y"))
+
+    def esc(s): return str(s).replace("\\","\\\\").replace("(","\\(").replace(")","\\)")
+
+    lines = [
+        f"OFFER OF EMPLOYMENT",
+        f"{company}",
+        f"Date: {date}",
+        f"",
+        f"Dear {name},",
+        f"",
+    ]
+    # word-wrap body
+    import textwrap
+    for para in body.split("\n"):
+        for ln in textwrap.wrap(para, 90) or [""]:
+            lines.append(ln)
+    lines += [
+        "", "=" * 60,
+        "COMPENSATION & OFFER DETAILS",
+        "=" * 60,
+        f"Candidate Name  : {name}",
+        f"Role            : {role}",
+        f"Annual CTC      : INR {ctc} LPA",
+        f"Department      : {dept}",
+        f"Location        : {loc}",
+        f"Joining Date    : {join}",
+        f"Probation       : {prob}",
+        f"Notice Period   : {notice}",
+        f"Offer Valid For : {valid}",
+        "", "=" * 60,
+        "BENEFITS",
+        "=" * 60,
+    ]
+    for b in bens:
+        lines.append(f"  * {b}")
+    lines += [
+        "", "=" * 60,
+        "E-SIGNATURE",
+        "=" * 60,
+        "By clicking the Accept Offer button in the email, you confirm that you",
+        "have read, understood, and agree to all terms of this offer. Your",
+        "acceptance constitutes a legally binding agreement.",
+        "",
+        f"Authorised Signatory: {sign}",
+        "Candidate Acceptance: (via email acceptance link)",
+        "",
+        f"This is a system-generated offer letter from {company} | Confidential",
+    ]
+
+    # Build PDF streams per page (72 lines per page)
+    page_size = 72
+    pages = [lines[i:i+page_size] for i in range(0, len(lines), page_size)]
+    if not pages:
+        pages = [[""]]
+
+    objects = []
+    # obj 1: catalog, obj 2: pages, obj 3: font, then pairs (page, content) per page
+    objects.append(None)  # placeholder index 0
+
+    # Font object (will be obj 3)
+    font_obj = b"<</Type /Font /Subtype /Type1 /BaseFont /Courier>>"
+
+    # Build page content streams
+    page_streams = []
+    for pg in pages:
+        ops = ["BT", "/F1 10 Tf", "50 780 Td", "12 TL"]
+        for ln in pg:
+            ops.append(f"({esc(ln)}) Tj T*")
+        ops.append("ET")
+        stream = "\n".join(ops).encode()
+        page_streams.append(stream)
+
+    # Assign object numbers:
+    # 1=catalog, 2=pages, 3=font
+    # then for each page: 4+2i = page dict, 5+2i = content stream
+    n_pages = len(page_streams)
+    catalog_num = 1
+    pages_num   = 2
+    font_num    = 3
+    first_page_num = 4
+
+    def obj(num, content):
+        return f"{num} 0 obj\n".encode() + content + b"\nendobj\n"
+
+    buf = b"%PDF-1.4\n"
+    offsets = {}
+
+    # catalog
+    offsets[catalog_num] = len(buf)
+    buf += obj(catalog_num, f"<</Type /Catalog /Pages {pages_num} 0 R>>".encode())
+
+    # pages
+    kids = " ".join(f"{first_page_num + 2*i} 0 R" for i in range(n_pages))
+    offsets[pages_num] = len(buf)
+    buf += obj(pages_num, f"<</Type /Pages /Kids [{kids}] /Count {n_pages}>>".encode())
+
+    # font
+    offsets[font_num] = len(buf)
+    buf += obj(font_num, font_obj)
+
+    # page dicts + content streams
+    for i, stream in enumerate(page_streams):
+        pg_num      = first_page_num + 2 * i
+        content_num = first_page_num + 2 * i + 1
+        # content stream
+        offsets[content_num] = len(buf)
+        stream_obj = (f"<</Length {len(stream)}>>\nstream\n").encode() + stream + b"\nendstream"
+        buf += obj(content_num, stream_obj)
+        # page dict
+        offsets[pg_num] = len(buf)
+        buf += obj(pg_num, (
+            f"<</Type /Page /Parent {pages_num} 0 R "
+            f"/MediaBox [0 0 595 842] "
+            f"/Contents {content_num} 0 R "
+            f"/Resources <</Font <</F1 {font_num} 0 R>>>>>>"
+        ).encode())
+
+    # xref
+    xref_pos = len(buf)
+    total_obj = 1 + font_num + n_pages * 2
+    buf += f"xref\n0 {total_obj + 1}\n0000000000 65535 f \n".encode()
+    for i in range(1, total_obj + 1):
+        off = offsets.get(i, 0)
+        buf += f"{off:010d} 00000 n \n".encode()
+    buf += (
+        f"trailer\n<</Size {total_obj + 1} /Root {catalog_num} 0 R>>\n"
+        f"startxref\n{xref_pos}\n%%EOF\n"
+    ).encode()
+    return buf
+
+
 def generate_offer_pdf(ol: dict, company: str) -> bytes:
-    """Generate a professional offer letter PDF using fpdf2."""
+    """Generate offer letter PDF — uses fpdf2 if available, otherwise built-in."""
     try:
         from fpdf import FPDF
-    except ImportError:
-        return b""
-
-    comp = ol.get("compensation", {})
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_margins(20, 20, 20)
-
-    # Header bar
-    pdf.set_fill_color(30, 20, 60)
-    pdf.rect(0, 0, 210, 28, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_xy(20, 8)
-    pdf.cell(0, 12, company, ln=True)
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_xy(20, 19)
-    pdf.cell(0, 6, "OFFER OF EMPLOYMENT — CONFIDENTIAL", ln=True)
-
-    pdf.set_text_color(30, 30, 30)
-    pdf.set_y(36)
-
-    # Date & ref
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 6, f"Date: {ol.get('date', datetime.now().strftime('%B %d, %Y'))}", ln=True)
-    pdf.ln(4)
-
-    # Greeting
-    pdf.set_text_color(30, 30, 30)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, f"Dear {ol.get('candidate_name', 'Candidate')},", ln=True)
-    pdf.ln(2)
-
-    # Body
-    pdf.set_font("Helvetica", "", 10)
-    body = ol.get("letter_body", f"We are delighted to offer you the position of {ol.get('role','Software Engineer')} at {company}.")
-    pdf.multi_cell(0, 6, body[:800])
-    pdf.ln(6)
-
-    # Compensation table
-    pdf.set_fill_color(245, 240, 255)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(60, 30, 120)
-    pdf.cell(0, 9, "COMPENSATION & BENEFITS", ln=True, fill=True)
-    pdf.set_text_color(30, 30, 30)
-    pdf.set_font("Helvetica", "", 10)
-
-    rows = [
-        ("Annual CTC", f"INR {comp.get('annual_ctc_lpa', ol.get('ctc_lpa',''))} LPA"),
-        ("Role / Designation", ol.get("role", "")),
-        ("Department", ol.get("department", "Engineering")),
-        ("Reporting To", ol.get("reporting_to", "Engineering Manager")),
-        ("Location", ol.get("location", "")),
-        ("Joining Date", ol.get("joining_date", "")),
-        ("Probation Period", ol.get("probation_period", "3 months")),
-        ("Notice Period", ol.get("notice_period", "2 months")),
-        ("Offer Valid Until", ol.get("offer_validity", "7 days from issue")),
-    ]
-    for label, val in rows:
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(70, 7, label, border="B")
+        comp = ol.get("compensation", {})
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_margins(20, 20, 20)
+        pdf.set_fill_color(30, 20, 60)
+        pdf.rect(0, 0, 210, 28, "F")
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_xy(20, 8)
+        pdf.cell(0, 12, company, ln=True)
         pdf.set_font("Helvetica", "", 9)
-        pdf.cell(0, 7, str(val), border="B", ln=True)
-
-    pdf.ln(5)
-    # Benefits
-    pdf.set_fill_color(230, 255, 240)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(10, 100, 60)
-    pdf.cell(0, 9, "BENEFITS INCLUDED", ln=True, fill=True)
-    pdf.set_text_color(30, 30, 30)
-    pdf.set_font("Helvetica", "", 10)
-    for b in ol.get("benefits", []):
-        pdf.cell(6, 6, "\x95")
-        pdf.cell(0, 6, b, ln=True)
-
-    pdf.ln(8)
-    # E-signature section
-    pdf.set_fill_color(255, 245, 230)
-    pdf.set_draw_color(200, 140, 0)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(150, 80, 0)
-    pdf.cell(0, 9, "E-SIGNATURE REQUIRED", ln=True, fill=True)
-    pdf.set_text_color(60, 60, 60)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6,
-        "Please review the terms above carefully. By clicking the acceptance link in your email, "
-        "you confirm that you have read, understood, and agree to all terms of this offer. "
-        "Your acceptance constitutes a legally binding agreement.")
-    pdf.ln(4)
-
-    # Signature lines
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(80, 6, "Authorised Signatory:", border=0)
-    pdf.cell(30, 6, "", border=0)
-    pdf.cell(80, 6, "Candidate Acceptance:", border=0, ln=True)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(80, 8, ol.get("signatory", f"HR Manager, {company}"), border="T")
-    pdf.cell(30, 8, "", border=0)
-    pdf.cell(80, 8, "(via email acceptance link)", border="T", ln=True)
-
-    # Footer
-    pdf.set_y(-18)
-    pdf.set_font("Helvetica", "I", 8)
-    pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 6, f"This is a system-generated offer letter from {company} | Confidential", align="C")
-
-    return bytes(pdf.output())
-
+        pdf.set_xy(20, 19)
+        pdf.cell(0, 6, "OFFER OF EMPLOYMENT - CONFIDENTIAL", ln=True)
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_y(36)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 6, f"Date: {ol.get('date', datetime.now().strftime('%B %d, %Y'))}", ln=True)
+        pdf.ln(4)
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, f"Dear {ol.get('candidate_name', 'Candidate')},", ln=True)
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "", 10)
+        body = ol.get("letter_body", f"We are delighted to offer you the position of {ol.get('role','Software Engineer')} at {company}.")
+        pdf.multi_cell(0, 6, body[:800])
+        pdf.ln(6)
+        pdf.set_fill_color(245, 240, 255)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(60, 30, 120)
+        pdf.cell(0, 9, "COMPENSATION & BENEFITS", ln=True, fill=True)
+        pdf.set_text_color(30, 30, 30)
+        rows = [
+            ("Annual CTC", f"INR {comp.get('annual_ctc_lpa', ol.get('ctc_lpa',''))} LPA"),
+            ("Role", ol.get("role", "")),
+            ("Department", ol.get("department", "Engineering")),
+            ("Location", ol.get("location", "")),
+            ("Joining Date", ol.get("joining_date", "")),
+            ("Probation Period", ol.get("probation_period", "3 months")),
+            ("Notice Period", ol.get("notice_period", "2 months")),
+            ("Offer Valid Until", ol.get("offer_validity", "7 days")),
+        ]
+        for label, val in rows:
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(70, 7, label, border="B")
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(0, 7, str(val), border="B", ln=True)
+        pdf.ln(5)
+        pdf.set_fill_color(230, 255, 240)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(10, 100, 60)
+        pdf.cell(0, 9, "BENEFITS", ln=True, fill=True)
+        pdf.set_text_color(30, 30, 30)
+        pdf.set_font("Helvetica", "", 10)
+        for b in ol.get("benefits", []):
+            pdf.cell(6, 6, "-")
+            pdf.cell(0, 6, str(b), ln=True)
+        pdf.ln(8)
+        pdf.set_fill_color(255, 245, 230)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(150, 80, 0)
+        pdf.cell(0, 9, "E-SIGNATURE REQUIRED", ln=True, fill=True)
+        pdf.set_text_color(60, 60, 60)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 6, "By clicking Accept Offer in your email, you confirm agreement to all terms of this offer.")
+        pdf.ln(8)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(80, 6, "Authorised Signatory:", border=0)
+        pdf.cell(0, 6, "Candidate Acceptance:", border=0, ln=True)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(80, 8, ol.get("signatory", f"HR Manager, {company}"), border="T")
+        pdf.cell(0, 8, "(via email acceptance link)", border="T", ln=True)
+        pdf.set_y(-18)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(150, 150, 150)
+        pdf.cell(0, 6, f"System-generated by A2A HR Platform | {company} | Confidential", align="C")
+        return bytes(pdf.output())
+    except Exception as e:
+        print(f"[fpdf2 failed: {e}] — using built-in PDF generator")
+        return _make_fallback_pdf(ol, company)
 
 def send_offer_email(candidate_email: str, candidate_name: str, role: str,
                      company: str, pdf_bytes: bytes, accept_url: str, reject_url: str = "") -> bool:
