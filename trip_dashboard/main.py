@@ -396,7 +396,7 @@ async def home():
 
 
 def _build_ui() -> str:
-    return """<!DOCTYPE html>
+    return r"""<!DOCTYPE html>
 <html>
 <head>
   <title>Trip Planner — A2A Platform</title>
@@ -506,7 +506,7 @@ def _build_ui() -> str:
 
   <!-- Trip type selector -->
   <div class="trip-toggle">
-    <button class="tt-btn" id="ttCorp" onclick="setTripType('corporate')">
+    <button class="tt-btn" id="ttCorp" onclick="setTripType('corporate')" style="border-color:#f59e0b;background:rgba(245,158,11,0.1);color:#fbbf24">
       <span class="tt-icon">🏢</span>
       <strong>Corporate Trip</strong>
       <div class="tt-sub">Bill goes to your company for approval. Booking confirmed after company pays.</div>
