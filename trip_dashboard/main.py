@@ -36,10 +36,14 @@ def sign_mandate(payload: dict) -> str:
 import httpx
 
 async def discover_agent(skill: str) -> dict | None:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f"{REGISTRY_URL}/registry/discover",
-                             params={"skill": skill}, timeout=10.0)
-        return (r.json().get("agents") or [None])[0]
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{REGISTRY_URL}/registry/discover",
+                                 params={"skill": skill}, timeout=10.0)
+            return (r.json().get("agents") or [None])[0]
+    except Exception as e:
+        print(f"[discover_agent] failed for skill={skill}: {e}")
+        return None
 
 
 async def send_a2a(agent_url: str, parts: list,
@@ -124,6 +128,7 @@ async def registry_status():
 # ── STEP 1: Plan trip via Travel Agent ────────────────────────────────────────
 @app.post("/plan-trip")
 async def plan_trip(request: Request):
+  try:
     body   = await request.json()
     report = {"flow_id": str(uuid.uuid4()), "steps": [], "trip_plan": {}, "status": "in_progress"}
     def step(msg): report["steps"].append(msg)
@@ -132,33 +137,67 @@ async def plan_trip(request: Request):
     agent = await discover_agent("plan_trip")
     if not agent:
         report["status"] = "failed"
-        report["error"]  = "Travel Agent not registered. Go to localhost:8000/register."
-        return JSONResponse(report, status_code=404)
+        report["error"]  = "Travel Agent not found in registry. Register it at your Registry with skill: plan_trip"
+        return JSONResponse(report)
     url = agent["supportedInterfaces"][0]["url"]
     step(f"✅ Found: {agent['name']} at {url}")
-    step("📋 Step 2: Fetching Travel Agent Card...")
-    async with httpx.AsyncClient() as client:
-        card = (await client.get(f"{url}/.well-known/agent-card.json", timeout=8.0)).json()
-    step(f"✅ Skills: {[s['id'] for s in card.get('skills',[])]}")
-    step("📤 Step 3: Sending trip request via A2A SendMessage...")
-    resp = await send_a2a(url, [
-        {"kind": "text", "text": f"Plan trip {body.get('origin')} to {body.get('destination')}",
-         "mediaType": "text/plain"},
-        {"kind": "data", "data": body, "mediaType": "application/json"}
-    ])
-    from typing import Any
-    def _extract_any(r: dict) -> dict:
+
+    # Wake up Render service
+    step("🔔 Waking up Travel Agent (Render cold start may take 30s)...")
+    import asyncio
+    for attempt in range(3):
         try:
-            for part in r["result"]["task"]["artifacts"][0]["parts"]:
-                if "data" in part: return part["data"]
+            async with httpx.AsyncClient(timeout=35.0) as client:
+                ping = await client.get(f"{url}/health")
+                if ping.status_code < 500:
+                    step("✅ Travel Agent is awake")
+                    break
+                if attempt < 2:
+                    step(f"⏳ Still starting up, waiting... (attempt {attempt+1}/3)")
+                    await asyncio.sleep(15)
         except Exception:
-            pass
-        return {}
-    trip = _extract_any(resp)
-    report["trip_plan"] = trip
-    report["status"]    = "completed"
-    step("✅ Trip options ready — select flight and hotel below.")
+            if attempt < 2:
+                await asyncio.sleep(15)
+
+    try:
+        step("📋 Step 2: Fetching Travel Agent Card...")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            card = (await client.get(f"{url}/.well-known/agent-card.json")).json()
+        step(f"✅ Skills: {[s['id'] for s in card.get('skills',[])]}")
+    except Exception:
+        step("⚠️ Could not fetch agent card — proceeding anyway")
+
+    step("📤 Step 3: Sending trip request via A2A SendMessage...")
+    try:
+        resp = await send_a2a(url, [
+            {"kind": "text", "text": f"Plan trip {body.get('origin')} to {body.get('destination')}",
+             "mediaType": "text/plain"},
+            {"kind": "data", "data": body, "mediaType": "application/json"}
+        ])
+        def _extract_any(r: dict) -> dict:
+            try:
+                for part in r["result"]["task"]["artifacts"][0]["parts"]:
+                    if "data" in part: return part["data"]
+            except Exception:
+                pass
+            return {}
+        trip = _extract_any(resp)
+        if not trip:
+            report["status"] = "failed"
+            report["error"]  = "Travel Agent returned empty response"
+            return JSONResponse(report)
+        report["trip_plan"] = trip
+        report["status"]    = "completed"
+        step("✅ Trip options ready — select flight and hotel below.")
+    except Exception as e:
+        report["status"] = "failed"
+        report["error"]  = f"Travel Agent error: {str(e)[:120]}"
+        step(f"❌ {report['error']}")
+
     return JSONResponse(report)
+
+  except Exception as e:
+    return JSONResponse({"steps": [f"❌ Server error: {str(e)}"], "status": "failed", "trip_plan": {}})
 
 
 # ── STEP 2: Confirm trip + send approval email ────────────────────────────────
