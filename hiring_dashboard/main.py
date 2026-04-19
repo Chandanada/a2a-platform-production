@@ -220,10 +220,16 @@ function startHiring() {
       }).join('');
     }
 
+    // Always show round1Section after sourcing — buttons must be visible
+    show('round1Section');
     if (data.schedule && data.schedule.schedules && data.schedule.schedules.length > 0) {
-      show('round1Section');
       renderSchedule(data.schedule, 'round1Content');
+    } else {
+      document.getElementById('round1Content').innerHTML =
+        '<div style="padding:12px;color:var(--amber);font-size:13px">⚠️ Scheduler was unavailable (Render cold start). ' +
+        'The schedule will be sent via email shortly, or click Round 1 Cleared below to proceed manually.</div>';
     }
+    document.getElementById('round1Section').scrollIntoView({behavior:'smooth'});
   })
   .catch(function(e) { addStep('❌ Error: ' + e.message); })
   .finally(function() { btn.disabled = false; btn.textContent = '🚀 Start Hiring Flow (Source + Round 1)'; });
@@ -394,47 +400,54 @@ async def hire(request: Request):
     num_found = len(cands.get("candidates", []))
     step(f"✅ Received {num_found} candidates")
 
-    # STEP 2: Schedule Round 1 ONLY — sequential flow requires HR to clear each round
+    # STEP 2: Schedule Round 1 — with Render wake-up ping + retry
     step("🔍 Step 3: Querying registry for Interview Scheduler Agent...")
     sched_agent = await discover_agent("schedule_interview")
     schedule = {}
+    scheduler_ok = False
     if not sched_agent:
-        report["status"] = "partial"
-        step("⚠️ No scheduler agent found — skipping interviews")
+        step("⚠️ No scheduler agent found in registry")
     else:
         surl = sched_agent["supportedInterfaces"][0]["url"]
         step(f"✅ Found: {sched_agent['name']} at {surl}")
+        # Wake up Render — free tier sleeps and returns 502 on cold start
+        step("🔔 Waking up scheduler (Render cold start may take 30s)...")
+        import asyncio
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    ping = await client.get(f"{surl}/health")
+                    if ping.status_code < 500:
+                        step("✅ Scheduler is awake — proceeding")
+                        break
+                    if attempt < 2:
+                        step(f"⏳ Still starting up, waiting 15s (attempt {attempt+1}/3)...")
+                        await asyncio.sleep(15)
+            except Exception:
+                if attempt < 2:
+                    await asyncio.sleep(15)
         step("📤 Step 4: Scheduling Round 1 (HR Screening) via A2A SendMessage...")
         try:
             sched_data = {**cands, "job_title": job_title, "location": location, "round_number": 1}
-            sresp = await send_message(
-                surl,
+            sresp = await send_message(surl,
                 f"Schedule Round 1 HR Screening interviews for {job_title} candidates.",
-                data=sched_data,
-                timeout=120.0
-            )
+                data=sched_data, timeout=120.0)
             if sresp.get("error") and "result" not in sresp:
-                step(f"⚠️ Scheduler: {sresp.get('error','')[:80]}")
+                step(f"⚠️ Scheduler error: {sresp.get('error','')[:100]}")
             else:
                 schedule = extract_artifact(sresp)
                 report["schedule"] = schedule
                 num_sched = len(schedule.get("schedules", []))
                 email_note = schedule.get("email_notifications", [])
                 email_sent = any(e.get("success") for e in email_note)
+                scheduler_ok = True
                 step(f"✅ Round 1 (HR Screening) scheduled for {num_sched} candidate(s)")
-                if email_sent:
-                    step("📧 Round 1 notification sent to HR team — check email")
-                else:
-                    step("⚠️ Email skipped (SMTP not configured or failed)")
+                step("📧 Round 1 email sent to HR team — check inbox" if email_sent else "⚠️ Email not sent — check GMAIL_SENDER / GMAIL_APP_PASS on Render")
         except Exception as e:
-            step(f"⚠️ Scheduler error: {str(e)[:100]}")
+            step(f"⚠️ Scheduler error: {str(e)[:120]}")
 
-    # ⚡ IMPORTANT: Background check is NOT run here.
-    # Flow: Round 1 cleared → Round 2 → Round 3 → Background Check
-    # HR triggers each next step manually via the dashboard buttons.
     report["status"] = "awaiting_round_1"
-    step("⏳ Awaiting HR to clear Round 1 before proceeding to Round 2")
-    step("💡 Use the dashboard buttons below to advance through rounds")
+    report["scheduler_ok"] = scheduler_ok
 
     # Log to audit
     try:
